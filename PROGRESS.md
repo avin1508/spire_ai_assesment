@@ -1,7 +1,7 @@
 # Progress
 
 **Current phase:** Phase 1: Navigation and Opportunities screen UI, restyled to match the reference (waiting for review)
-**Current prompt:** #5
+**Current prompt:** #6
 **Last updated:** 2026-10-24
 
 ## Locked feature scope
@@ -69,6 +69,7 @@ The core assessment requirements come first. Other features must not break them.
 | 2026-10-24 | Emulator taps: list/map toggle, Saved tab, Skills tab, back to Jobs | Passed: all switched correctly; Jobs kept its nested tab state |
 | 2026-10-24 | Restyled UI on emulator vs the reference screenshot (Prompt #4) | Passed: bundle built, no Metro errors; layout matches closely; the Applied tab scrolls into view |
 | 2026-10-24 | Jobs tab swipe on emulator (Prompt #5) | Passed: swipes in both directions across all 4 tabs; label taps still work; the chip row scrolls without changing tabs; expo-doctor 20/20 |
+| 2026-10-24 | Visual check of emulator vs the user's 4 phone screenshots (Prompt #6) | Passed: header, tabs, empty states, map and bottom nav match; no code changes needed. The only difference is the Expo Go dev-tools gear button (not app UI) |
 | — | iOS device or simulator | **Not tested** (no macOS available) |
 | — | Physical Android device | **Not tested** |
 | — | Linting | **Not available**: no ESLint config in the project; none added to avoid extra dependencies |

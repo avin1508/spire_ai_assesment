@@ -537,3 +537,58 @@ Then implement the changes directly in the existing codebase and explain which f
 
 ### AI mistakes and fixes
 - None observed in this prompt.
+
+---
+
+## Prompt #6: Visual check of the running app against the user's phone screenshots
+
+- **Date/time:** 2026-10-24, about 02:08–02:14 IST
+- **AI tool:** Claude
+- **Objective:** Run the app, open the Jobs / Opportunities screen, compare it with 4 reference screenshots (taken by the user in Expo Go on their phone: All Jobs, Recommended, Saved, Applied), and fix only the differences that can be verified.
+
+### Exact prompt
+
+````
+Run my existing React Native Expo project and visually verify the Jobs / Opportunities screen against the 4 reference screenshots I provided.
+
+Follow these steps:
+
+1. Inspect the project and identify the correct Expo start command.
+2. Check whether dependencies and the required environment are available.
+3. Start the Expo development server.
+4. If an Android emulator is available, launch the app on it. Otherwise, check whether another available preview method can be used.
+5. Navigate to the Jobs / Opportunities screen and compare it against all 4 reference screenshots.
+6. Identify actual visual differences in the header, tabs, empty states, map screen, and bottom navigation.
+7. Fix only the differences you can verify. Do not make unrelated changes.
+8. Run the available checks and report any errors.
+
+Important:
+- Do not claim the app was visually tested unless you actually opened and inspected the running app.
+- If no emulator or visual preview is available, tell me exactly what is missing and how I can provide access.
+- Do not replace the existing map with a static image.
+- Preserve existing functionality and project architecture.
+
+At the end, report the command used, whether the app launched successfully, what you visually verified, which files you changed, and any remaining issues.
+````
+
+(The 4 screenshots were sent while the task was running.)
+
+### Commands run
+```bash
+npx expo-doctor                         # 20/20 passed
+CI=1 npx expo start --android --port 8081   # same as `npm run android`, non-interactive
+adb exec-out screencap -p / adb shell input tap|swipe / adb shell uiautomator dump
+```
+
+### Verification and results
+- The app launched in Expo Go on the Pixel_5 emulator: `Android Bundled ... index.js`, with no errors or warnings in the Metro log.
+- Compared the emulator screenshots with all 4 reference screenshots:
+  - **Header, tabs, bottom navigation:** match (title, outlined Upload Resume, blue share icon, grey bell; tab labels with counts and the blue underline; the active tab scrolls into view on Applied; Jobs/Skills/Learning/Profile icons and colours).
+  - **Empty states (Recommended, Saved, Applied):** match (icon circle, title and message text).
+  - **All Jobs map:** matches. The phone screenshot showed the Recommended and Verified chips in their selected state. After selecting the same chips on the emulator, the style was identical.
+- The only difference was the grey/blue **gear button** in the phone screenshots. It is Expo Go's floating developer-tools button, not app UI. On the emulator it is hidden because `expo start --android` opens the app with `__expo_disable_fab=1`. It can't be fixed in app code.
+- **Code changes:** none. No differences in the app itself were found.
+
+### AI mistakes and fixes
+- **A false bug lead from batched input.** Claude sent several `adb` taps back-to-back and took one screenshot at the end. The screenshots showed the wrong tab (Saved, then Skills, then Profile), which looked like a tab-tap bug. Claude re-tested with one tap and one screenshot at a time, after waiting for the transition to finish. Tapping worked correctly every time, and the earlier chip taps had actually registered. Lesson: do one action per screenshot and wait for animations to finish before deciding something is a bug.
+- An `adb pull /sdcard/...` command failed because Git Bash rewrote the device path. Fixed with `MSYS_NO_PATHCONV=1`.
