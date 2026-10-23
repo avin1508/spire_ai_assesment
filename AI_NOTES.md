@@ -227,3 +227,313 @@ No dependencies were added and no code was changed. The setup from Prompt #1 was
 
 ### AI mistake and fix
 - None observed in this prompt.
+
+---
+
+## Prompt #3: Navigation, reusable components, Opportunities screen UI
+
+- **Date/time:** 2026-10-24, about 00:58–01:17 IST
+- **AI tool:** Claude
+- **Objective:** Set up React Navigation with main bottom tabs (Jobs, Skills, Learning, Profile) and nested Jobs tabs (Recommended, All Jobs, Saved, Applied). Build reusable UI components and the Opportunities (All Jobs) screen using only local mock data. No backend, auth, AI, or real map.
+
+### Exact prompt
+
+````
+Implement Prompt #3 for the existing `spire_ai` project. This task covers navigation setup, reusable UI components, and the initial Opportunities / Jobs Home screen only.
+
+Before coding, inspect `frontend/`, `AI_NOTES.md`, `PROGRESS.md`, and `README.md`. Follow the existing project structure and preserve unrelated files.
+
+## 1. Locked requirements
+
+- React Native + Expo.
+- JavaScript only: no TypeScript, `.ts`, or `.tsx`.
+- Use React Navigation, not Expo Router.
+- Use the existing Expo SDK-compatible package versions.
+- Do not implement backend integration or business logic in this task.
+
+## 2. Install and configure navigation
+
+Set up React Navigation with the necessary Expo-compatible dependencies.
+
+Create the main bottom-tab navigation:
+- Jobs
+- Skills
+- Learning
+- Profile
+
+Inside Jobs, create a nested tab bar:
+- Recommended
+- All Jobs
+- Saved
+- Applied
+
+Use placeholder screens for tabs that are not implemented yet. Keep navigation functional, with the Jobs tab opening the Opportunities screen by default.
+
+## 3. Build reusable UI components
+
+Create reusable components with sensible separation of responsibilities:
+
+- `AppHeader` — Opportunities title, Upload Resume button, Share icon, Notification bell.
+- `JobsTabBar` — Recommended, All Jobs, Saved, Applied.
+- `LocationSearchBar` — location icon, search input, list/map toggle.
+- `FilterChip` — reusable filter chip.
+- `MapControls` — zoom and current-location visual controls.
+- `AgentSigmaButton` — floating AI assistant button.
+- `BottomActionBar` — View Companies and View Jobs controls.
+- `BottomTabBar` — main app navigation if a custom tab bar is necessary.
+
+Do not duplicate navigation bars or create unnecessary abstractions. Reuse React Navigation's tab bar where appropriate.
+
+## 4. Opportunities screen UI
+
+Use the attached reference screenshot as the primary visual reference. Match its layout, proportions, spacing, colors, and component placement as closely as practical.
+
+The screen should include:
+- Header with Opportunities, Upload Resume, Share, and notification icons.
+- Horizontal job tabs.
+- Large map-style background covering most of the screen.
+- Sample Indian city labels and blue job/company markers.
+- Location search and list/map toggle.
+- Filter chips: Recommended, Verified, Last 24 hours.
+- Zoom-in, zoom-out, and current-location controls.
+- Floating Agent Sigma button at the lower-right.
+- View Companies and View Jobs action buttons.
+- Bottom navigation: Jobs, Skills, Learning, Profile.
+
+Use a suitable static map-style visual or a locally generated placeholder asset. Do not copy Google Maps branding, watermark, or protected screenshot assets. Do not integrate a real map provider yet.
+
+Use local mock data for markers and counts. Do not call APIs or connect to a database.
+
+## 5. Visual and code quality
+
+- Keep the layout mobile-first and responsive.
+- Handle safe areas and Android navigation/status bars correctly.
+- Use consistent colors, spacing, and typography.
+- Ensure touch targets are usable.
+- Keep component styles organized.
+- Avoid adding dependencies that are not needed.
+- All source code must remain JavaScript.
+
+## 6. Explicitly out of scope
+
+Do not implement:
+- Backend APIs or MongoDB.
+- Authentication logic.
+- Resume upload/parsing.
+- Gemini integration.
+- Saved/applied persistence.
+- Real map integration or location permissions.
+- FCM or background processing.
+- Full Skills, Learning, Profile, or Job Details screens.
+
+Only create functional navigation and the initial Jobs / Opportunities screen; other destinations can show simple placeholders.
+
+## 7. Required tracking and verification
+
+After implementation:
+1. Run appropriate lint or static checks available in the project.
+2. Start Expo and verify the Android JavaScript bundle builds if possible.
+3. Fix issues introduced by this task.
+4. Update `AI_NOTES.md` with this exact prompt, objective, files changed, and actual verification results.
+5. Update `PROGRESS.md` accurately.
+6. Update `README.md` if dependencies or run instructions change.
+7. Check Git status before suggesting any commit. Do not commit automatically.
+8. Report files changed, dependencies added, commands run, verification results, and anything still pending.
+
+Do not start the next feature after finishing this task. Stop and wait for review.
+````
+
+### Key decisions
+- **No reference screenshot was actually attached** to the prompt, so the layout follows the written spec.
+- The nested Jobs tabs reuse `createBottomTabNavigator` with `tabBarPosition: 'top'` and a custom `JobsTabBar`. This avoids adding `@react-navigation/material-top-tabs` and `react-native-pager-view`.
+- The main tabs use React Navigation's built-in tab bar, which handles the bottom safe area. No custom `BottomTabBar` was needed, so none was created.
+- Placeholder tabs share one `PlaceholderScreen`, which gets its title, icon and message from `initialParams`.
+- The map is drawn with plain `View`s (water, parks, highways between cities, labels, pins). No image asset, SVG library, or map provider is used.
+
+### Dependencies added (all via `npx expo install`, SDK 58 compatible)
+- `@react-navigation/native` ^7.5.1
+- `@react-navigation/bottom-tabs` ^7.21.0
+- `react-native-screens` ~4.30.0
+- `react-native-safe-area-context` ~5.10.1
+- `@expo/vector-icons` ^15.0.2
+- `expo-font` ~58.0.9 (required peer of `@expo/vector-icons`; `expo install` also added it to `app.json` `plugins`)
+
+### Files created or modified
+- Modified: `frontend/App.js`, `frontend/app.json` (expo-font plugin), `frontend/package.json`, `frontend/package-lock.json`
+- Created: `frontend/src/theme.js`, `frontend/src/data/mockMap.js`
+- Created: `frontend/src/navigation/RootNavigator.js`, `frontend/src/navigation/JobsNavigator.js`
+- Created: `frontend/src/screens/OpportunitiesScreen.js`, `frontend/src/screens/PlaceholderScreen.js`
+- Created: `frontend/src/components/AppHeader.js`, `JobsTabBar.js`, `LocationSearchBar.js`, `FilterChip.js`, `MapPlaceholder.js`, `MapControls.js`, `AgentSigmaButton.js`, `BottomActionBar.js`
+- Updated: `README.md`, `PROGRESS.md`, `AI_NOTES.md`
+
+### Commands run
+```bash
+npx expo install @react-navigation/native @react-navigation/bottom-tabs react-native-screens react-native-safe-area-context
+npx expo install @expo/vector-icons
+npx expo install expo-font
+npx expo-doctor
+npx expo export --platform android --output-dir <scratch dir outside the repo>
+emulator -avd Pixel_5
+CI=1 npx expo start --android --port 8081
+adb exec-out screencap -p   # screenshots; adb shell input tap   # tab and toggle taps
+```
+
+### Verification and results
+- Checked every Ionicons name used against the installed glyph map: all exist.
+- `npx expo-doctor`: **failed at first** (missing peer dependency `expo-font`). After `npx expo install expo-font`, it passed **20/20**.
+- `npx expo export --platform android`: passed and produced a Hermes bundle.
+- Android emulator (Pixel_5, Expo Go installed by `expo start --android`): the app loaded with `Android Bundled ... index.js` and no errors in the Metro log.
+  - Screenshots confirmed the header, nested tabs (All Jobs active by default), search bar and toggle, chips, map with city labels and markers, zoom and locate controls, Agent Sigma, action buttons, and bottom tabs.
+  - Tapping the list toggle showed the list placeholder. Tapping Saved showed the Saved placeholder. Tapping Skills showed the Skills placeholder with its header. Tapping Jobs returned to Jobs with the Saved sub-tab still selected.
+- No `.ts`/`.tsx` files exist outside `node_modules`.
+- **Not done:** linting (the project has no ESLint config), iOS, and a physical device.
+
+### AI mistakes and fixes
+1. **Blank map caused by an unverified API assumption.**
+   - **Mistake:** Claude styled the map container with `...StyleSheet.absoluteFillObject`. The first emulator screenshot showed an empty map: no water, roads, cities or markers.
+   - **Why it was wrong:** In the installed React Native 0.88, that spread didn't apply absolute positioning. The container got zero height, and `overflow: 'hidden'` clipped everything inside it. Claude had used the API from memory without checking the installed version.
+   - **Fix:** Replaced it with explicit `position: 'absolute', top/left/right/bottom: 0`. The next screenshot showed the map correctly.
+2. **Missing peer dependency.** Claude installed `@expo/vector-icons` without its required native peer `expo-font`. `expo-doctor` caught this ("Your app may crash outside of Expo Go"). Fixed with `npx expo install expo-font`.
+3. **Layout overlaps (found from screenshots).** The search bar ran edge to edge with no margin, the top markers sat under the filter chips, and some pins covered the city labels (New Delhi, Mumbai, Kolkata). Fixed by adding horizontal padding around the search bar and moving the mock coordinates into the clear part of the map.
+
+---
+
+## Prompt #4: Restyle the Opportunities UI to match the reference screenshot
+
+- **Date/time:** 2026-10-24, about 01:20–01:28 IST
+- **AI tool:** Claude
+- **Objective:** Restyle the Prompt #3 UI to closely match a reference screenshot of the iExchange Opportunities screen, which the user attached to this prompt. Behaviour and scope stay the same: UI only, mock data.
+
+### Exact prompt
+
+````
+every thing is fine but there is one problem bro and that is ui i need similar to this did you n you do
+````
+
+(The prompt had a screenshot attached showing the reference Opportunities screen.)
+
+### What changed (restyle only; no new features or dependencies)
+- **Header:** "Upload Resume" is now an outlined pill. The share icon is blue and the bell is a grey outline.
+- **Jobs tabs:** the bar scrolls horizontally, and the labels show counts ("Recommended (0)", "Saved (0)", "Applied (0)"). It auto-scrolls only when the active tab is partly hidden.
+- **Search:** a pill-shaped "Search Location" field, with the list/map toggle in its own pill. The active mode is a filled blue circle.
+- **Filters:** an icon-only filter button, a "Recommended" chip with a gold sparkle, and "Verified" and "Last 24 hours" chips with blue dots.
+- **Map illustration:**
+  - mint land with lighter patches, a sea on the east and west
+  - thin grey roads and dashed state borders
+  - uppercase state labels and a bold "India" label, with hollow-dot city labels
+  - teardrop job pins and white company callouts (briefcase, count, and a blue company name)
+  - It's still drawn with plain Views: no map provider, no copied map tiles or branding.
+- **Map controls:** zoom +/− in one card, and a blue locate icon in a separate card.
+- **Agent Sigma:** a blue circle with a light halo.
+- **Action buttons:** centred white pills for "View companies" and "View jobs (N)".
+- **Bottom tab icons:** a puzzle piece for Skills and a book for Learning.
+- **Mock data:** reworked in `mockMap.js`. It now has region labels, roads, state borders, land patches, company markers and tab counts. Positions are estimated from the reference screenshot.
+- **Note on the mock data:** the company names ("Kotak Mahindra", "Accenture") and the job count (186445) were copied from the reference screenshot. They are mock values only.
+
+### Files modified
+- `frontend/src/theme.js`, `frontend/src/data/mockMap.js`
+- `frontend/src/components/AppHeader.js`, `JobsTabBar.js`, `LocationSearchBar.js`, `FilterChip.js`, `MapPlaceholder.js`, `MapControls.js`, `AgentSigmaButton.js`, `BottomActionBar.js`
+- `frontend/src/screens/OpportunitiesScreen.js`
+- `frontend/src/navigation/JobsNavigator.js`, `frontend/src/navigation/RootNavigator.js`
+- `AI_NOTES.md`, `PROGRESS.md`, `README.md`
+
+### Verification and results
+- Checked every new Ionicons name against the installed glyph map: all exist.
+- `CI=1 npx expo start --android` on the Pixel_5 emulator: `Android Bundled ... (1052 modules)`, with no errors in the Metro log.
+- Compared emulator screenshots with the reference: the layout, shapes, colours and positions match closely.
+- Tapped the Applied tab: the tab bar scrolled to show it, and the Applied placeholder opened.
+- **Not re-run:** `expo-doctor` (no dependency changes since it last passed 20/20). Also not tested on iOS or a physical device.
+
+### AI mistakes and fixes
+1. **The first restyle had a tab-bar scroll bug.** The auto-scroll always scrolled to the active tab, so on first load "Recommended" was cut off on the left. The reference starts unscrolled. Fixed by scrolling only when the active tab is partly outside the visible area.
+2. **The first restyle had overlaps** (found from a screenshot). The action buttons hid the Bengaluru label and the Accenture callout, and "CHHATTISGARH" collided with the Kotak callout and the map controls. Fixed by raising the action bar to 9% from the bottom, moving the southern cities and labels up, and moving the CHHATTISGARH label.
+3. **Shell edit escaping.** A `sed` substitution for the `ANDHRA\nPRADESH` label didn't match because of backslash escaping. The `grep` output caught it, and Claude fixed it with a direct file edit.
+
+---
+
+## Prompt #5: Swipe navigation between the Jobs tabs
+
+- **Date/time:** 2026-10-24, about 01:33–01:38 IST
+- **AI tool:** Claude
+- **Objective:** Let users swipe horizontally between Recommended, All Jobs, Saved and Applied, while tapping the labels still works. The UI, the tab bar and the other screens must stay exactly the same.
+
+### Exact prompt
+
+````
+I have an existing React Native Expo app with a Jobs screen. At the top of the screen, I have horizontal tabs:
+
+- Recommended
+- All Jobs
+- Saved
+- Applied
+
+Currently, users can switch between these tabs only by tapping on the tab labels. I want to add **horizontal swipe gesture navigation**, similar to native mobile apps.
+
+### Required behavior
+
+1. When the user swipes from right to left, navigate to the next tab.
+   - Recommended → All Jobs
+   - All Jobs → Saved
+   - Saved → Applied
+
+2. When the user swipes from left to right, navigate to the previous tab.
+
+3. Tapping on any tab label should continue to work as it does currently.
+
+4. The active tab indicator, tab label styling, and displayed content must stay synchronized with the selected tab.
+
+5. The content should slide smoothly during swipe gestures, providing a native mobile app experience.
+
+### Important constraints
+
+- **Do not redesign or modify the existing UI.** Keep the current header, tab labels, active indicator, spacing, colors, map, filters, job markers, and bottom navigation exactly as they are.
+- Integrate swipe functionality into the existing implementation instead of rebuilding the screen.
+- Preserve all existing tab-specific logic, API calls, filters, saved jobs, applied jobs, and state management.
+- Avoid conflicts between horizontal tab swipes and the map's own gestures. Swiping the map should continue to work normally.
+- Use a solution compatible with my existing Expo and React Native versions. Prefer `react-native-tab-view` with `react-native-pager-view` if suitable, but first inspect the existing project and dependencies. Reuse existing libraries where possible.
+- Do not introduce unnecessary dependencies or refactor unrelated components.
+
+### Before making changes
+
+Inspect the current Jobs screen, its tab implementation, package.json, and relevant components. Identify the smallest safe change needed to add swipe navigation.
+
+Then implement the changes directly in the existing codebase and explain which files you modified.
+
+**Expected result:** The tabs should work both by tapping their labels and by swiping horizontally across the tab content, without changing the current UI or breaking existing functionality.
+````
+
+### Approach
+- The Jobs sub-tabs used `createBottomTabNavigator` with `tabBarPosition: 'top'` and a custom `tabBar`. That navigator has no swipe support.
+- The smallest change was to swap it for `createMaterialTopTabNavigator`, which is built on `react-native-tab-view` and `react-native-pager-view`. It passes the same `state`, `descriptors` and `navigation` props to a custom `tabBar`. Because of that, `JobsTabBar`, the screens, the routes and the tab options stay unchanged.
+- The bottom-tabs-only options (`headerShown`, `tabBarPosition`) were removed and `swipeEnabled: true` was set.
+
+### Dependencies added (via `npx expo install`, SDK 58 compatible)
+- `@react-navigation/material-top-tabs` ^7.8.1
+- `react-native-tab-view` ^4.3.4
+- `react-native-pager-view` 9.0.7
+
+### Files modified
+- `frontend/src/navigation/JobsNavigator.js`: navigator import, constructor, and `screenOptions`.
+- `frontend/package.json`, `frontend/package-lock.json`: the new dependencies.
+- `AI_NOTES.md`, `PROGRESS.md`, `README.md`.
+
+### Verification and results
+- `npx expo-doctor`: passed **20/20**.
+- `CI=1 npx expo start --android` on the Pixel_5 emulator: `Android Bundled ... (1070 modules)`, with no errors or warnings in the Metro log.
+- Swipe tests using `adb shell input swipe`, with screenshots:
+  - Right to left from All Jobs: went to Saved, then to Applied.
+  - Left to right from Applied, three times: went back to Saved, then All Jobs, then Recommended.
+  - Each time, the label colour and the underline moved to the active tab, and the tab bar scrolled the active label into view.
+- Tapping the All Jobs label switched tabs, as before.
+- Swiping horizontally on the filter-chip row scrolled the chips and stayed on All Jobs (the nested horizontal scroll takes priority).
+- The UI looked the same in screenshots as it did before the change.
+- **Not verified:**
+  - iOS and a physical device.
+  - Whether the tab indicator follows the finger during a drag: the custom tab bar updates when the swipe finishes, and screenshots can't show the in-between frames.
+
+### Known trade-off: map gestures
+- The map is currently a static illustration with no pan or zoom gestures, so there is no conflict yet. Swiping across the map area changes tabs, which is the required All Jobs → Saved behaviour.
+- When a real interactive map is added, its pan gestures will compete with the pager. The planned fix is to set `options={{ swipeEnabled: false }}` on the `AllJobs` screen (tab taps still work), or to limit swiping to non-map areas. That decision is deferred to the real-map task.
+
+### AI mistakes and fixes
+- None observed in this prompt.

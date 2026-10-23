@@ -1,7 +1,7 @@
 # Progress
 
-**Current phase:** Phase 0: Project initialization (waiting for review)
-**Current prompt:** #2
+**Current phase:** Phase 1: Navigation and Opportunities screen UI, restyled to match the reference (waiting for review)
+**Current prompt:** #5
 **Last updated:** 2026-10-24
 
 ## Locked feature scope
@@ -27,7 +27,7 @@ The core assessment requirements come first. Other features must not break them.
 - Background resume processing (BullMQ + Redis)
 - In-app notifications and FCM push notifications
 
-**Locked stack:** React Native + Expo (JavaScript), Node.js + Express (ES modules), MongoDB, Gemini, BullMQ + Redis, FCM. No TypeScript.
+**Locked stack:** React Native + Expo (JavaScript), React Navigation (not Expo Router), Node.js + Express (ES modules), MongoDB, Gemini, BullMQ + Redis, FCM. No TypeScript.
 
 ## Tasks
 
@@ -36,16 +36,24 @@ The core assessment requirements come first. Other features must not break them.
 - [x] Express backend in `backend/` with `GET /health` (Prompt #1)
 - [x] Backend `.env.example`, root `.gitignore`, README (Prompt #1)
 - [x] Tracking files `AI_NOTES.md` and `PROGRESS.md`; README expanded (Prompt #2)
+- [x] Setup committed by the user (`db79730 project setup`, `86a8442 project`)
+- [x] React Navigation: main bottom tabs (Jobs, Skills, Learning, Profile) (Prompt #3)
+- [x] Nested Jobs tabs (Recommended, All Jobs, Saved, Applied) with a custom top tab bar; All Jobs opens by default (Prompt #3)
+- [x] Reusable components: AppHeader, JobsTabBar, LocationSearchBar, FilterChip, MapPlaceholder, MapControls, AgentSigmaButton, BottomActionBar (Prompt #3)
+- [x] Opportunities screen UI with local mock data (Prompt #3)
+- [x] Opportunities UI restyled to match the user's reference screenshot (Prompt #4)
+- [x] Swipe navigation between the Jobs tabs using material top tabs and pager-view; the UI is unchanged (Prompt #5)
 
 ### In progress
-- [ ] Review of Phase 0 initialization
+- [ ] Review of the restyled UI and swipe navigation (Prompts #4 and #5)
 
 ### Pending
-- [ ] Initial Git commit of the setup (waiting for approval)
+- [ ] Commit of the Prompt #3 and #4 changes. Prompt #3 files are staged by the user; Prompt #4 edits are unstaged.
 - [ ] MongoDB connection and data models
 - [ ] Auth (Login/Signup)
 - [ ] Seeded jobs, jobs list API with search
-- [ ] Frontend screens: jobs list, job detail, login, profile
+- [ ] Jobs list view content, Job detail screen
+- [ ] Real map integration
 - [ ] All other target features listed above
 
 ## Test results
@@ -54,18 +62,30 @@ The core assessment requirements come first. Other features must not break them.
 | --- | --- | --- |
 | 2026-10-24 | Backend `npm start` + `curl /health` | Passed: `{"status":"ok"}` |
 | 2026-10-24 | Backend `npm run dev` (nodemon, PORT=5055) + `curl /health` | Passed: `{"status":"ok"}` |
-| 2026-10-24 | Expo `CI=1 npx expo start`, `/status` + Android bundle request | Passed: `packager-status:running`, HTTP 200, 744 modules |
-| 2026-10-24 | App opened on a physical device or emulator | **Not done yet** |
+| 2026-10-24 | Expo `CI=1 npx expo start`, `/status` + Android bundle request (blank app) | Passed |
+| 2026-10-24 | `npx expo-doctor` (Prompt #3) | Failed at first: missing `expo-font` peer dependency. Fixed; then passed 20/20 |
+| 2026-10-24 | `npx expo export --platform android` (Prompt #3) | Passed: Hermes bundle built |
+| 2026-10-24 | Expo Go on Android emulator (Pixel_5 AVD), Opportunities screen | Passed after a fix: the map was blank at first (see AI_NOTES #3), then rendered correctly |
+| 2026-10-24 | Emulator taps: list/map toggle, Saved tab, Skills tab, back to Jobs | Passed: all switched correctly; Jobs kept its nested tab state |
+| 2026-10-24 | Restyled UI on emulator vs the reference screenshot (Prompt #4) | Passed: bundle built, no Metro errors; layout matches closely; the Applied tab scrolls into view |
+| 2026-10-24 | Jobs tab swipe on emulator (Prompt #5) | Passed: swipes in both directions across all 4 tabs; label taps still work; the chip row scrolls without changing tabs; expo-doctor 20/20 |
+| — | iOS device or simulator | **Not tested** (no macOS available) |
+| — | Physical Android device | **Not tested** |
+| — | Linting | **Not available**: no ESLint config in the project; none added to avoid extra dependencies |
 
 ## Known issues
-- A tracked file `temp` (from the first commit) appears as deleted in `git status`. It was deleted before AI work started and has been left alone.
-- The Expo template added `frontend/AGENTS.md` and `frontend/.claude/settings.json`. `AGENTS.md` recommends Expo Router and TypeScript checks, which do not match this project's JavaScript-only setup. Both files have been kept for now.
-- `npm install` in `frontend/` reports `npm audit` warnings in Expo's dependencies. They have not been fixed, because `audit fix --force` could break SDK version pins.
+- The reference screenshot arrived with Prompt #4, and the UI was restyled to match it. Positions are estimates; it is not a pixel-perfect match.
+- Jobs tab swipe is enabled on All Jobs. The map is static now, so there is no gesture conflict. When a real map is added, disable swipe on All Jobs or limit it to non-map areas.
+- The mock company names (Kotak Mahindra, Accenture) and job count (186445) were taken from the reference screenshot and are placeholders.
+- Header buttons, map controls, Agent Sigma, and View Companies / View Jobs don't do anything yet (UI only). Search input and filter chips only update local state.
+- The map is a static, locally drawn illustration. Marker positions are mock percentages, not real coordinates.
+- The Expo template added `frontend/AGENTS.md` and `frontend/.claude/settings.json`. `AGENTS.md` recommends Expo Router and TypeScript checks, which don't match this project (React Navigation, JavaScript only). Both files have been kept for now.
+- `npm install` in `frontend/` reports `npm audit` warnings in transitive dependencies. They have not been fixed, because `audit fix --force` could break SDK version pins.
 
 ## Remaining assessment deliverables
-- [ ] Source repository with regular Git commits (only the initial `first commit` exists so far)
-- [ ] README with setup, technology choices, completed and missing features (started; keep updated)
-- [ ] AI notes with tools, key prompts and one genuine AI mistake that was corrected (started)
-- [ ] Working demo on a device or emulator
+- [ ] Source repository with regular Git commits (3 commits so far; Prompt #3 changes not yet committed)
+- [ ] README with setup, technology choices, completed and missing features (keep updated)
+- [x] AI notes with tools, key prompts and one genuine AI mistake that was corrected (keep updating)
+- [ ] Working demo on a device or emulator (the UI runs on an Android emulator; core features still missing)
 - [ ] Ability to explain the code
 - [ ] Ability to make a small live change during the demo

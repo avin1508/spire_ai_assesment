@@ -2,13 +2,15 @@
 
 Practical assessment project: a job-matching mobile app. Users can upload a resume (as a guest or with an account), get AI-based job recommendations, browse and search jobs, and track saved and applied jobs.
 
-> **Status:** Phase 0 (project initialization) is done. No app features are built yet. See [PROGRESS.md](PROGRESS.md).
+> **Status:** Phase 1 (navigation and Opportunities screen UI) is done and waiting for review. The UI uses only local mock data; there is no backend integration yet. See [PROGRESS.md](PROGRESS.md).
 
 ## Tech stack
 
 | Layer | Technology | Status |
 | --- | --- | --- |
-| Mobile frontend | React Native + Expo (SDK 58), JavaScript only | Initialized |
+| Mobile frontend | React Native + Expo (SDK 58), JavaScript only | Navigation + Opportunities UI |
+| Navigation | React Navigation 7: bottom tabs for the main app; material top tabs (`react-native-tab-view` + `react-native-pager-view`) for the swipeable Jobs tabs | Done |
+| Icons | `@expo/vector-icons` (Ionicons) + `expo-font` | Done |
 | Backend API | Node.js + Express 5, JavaScript ES modules | Initialized |
 | Database | MongoDB | Not started |
 | AI | Gemini API | Not started |
@@ -21,11 +23,18 @@ The project uses JavaScript only, with no TypeScript.
 
 ```
 spire_ai/
-├── frontend/          # Expo app (blank JavaScript template)
-│   ├── App.js
+├── frontend/          # Expo app (JavaScript)
+│   ├── App.js                 # SafeAreaProvider + NavigationContainer
 │   ├── index.js
 │   ├── app.json
-│   └── assets/
+│   ├── assets/
+│   └── src/
+│       ├── theme.js           # colors, spacing, radius, typography
+│       ├── navigation/        # RootNavigator (main tabs), JobsNavigator (nested tabs)
+│       ├── screens/           # OpportunitiesScreen, PlaceholderScreen
+│       ├── components/        # AppHeader, JobsTabBar, LocationSearchBar, FilterChip,
+│       │                      # MapPlaceholder, MapControls, AgentSigmaButton, BottomActionBar
+│       └── data/mockMap.js    # local mock cities, markers and counts
 ├── backend/           # Express API
 │   ├── src/server.js
 │   ├── .env.example
@@ -84,7 +93,15 @@ More variables (MongoDB URI, Gemini key, Redis URL, Firebase credentials) will b
 
 ## Testing
 
-There are no automated tests yet. Manual checks:
+There are no automated tests yet. Static checks:
+
+```bash
+cd frontend
+npx expo-doctor                                   # dependency/config checks
+npx expo export --platform android --output-dir <tmp-dir>   # full Android bundle build
+```
+
+Manual checks:
 
 ```bash
 # Backend: start the server, then:
@@ -100,8 +117,13 @@ cd frontend && npm start
 
 ### Completed
 - Project initialization: Expo frontend, Express backend, `/health` endpoint.
+- Main bottom tabs: Jobs, Skills, Learning, Profile (Skills, Learning and Profile are placeholders).
+- Nested Jobs tabs: Recommended, All Jobs (default), Saved, Applied (all except All Jobs are placeholders). You can switch tabs by tapping or by swiping horizontally.
+- Opportunities screen UI (All Jobs), styled to match the iExchange reference. It has a header (Upload Resume, Share, notifications), scrollable job tabs with counts, a location search pill with a list/map toggle, and filter chips (Recommended, Verified, Last 24 hours). The map is a static illustration with state borders, region and city labels, job pins and company callouts. It also has zoom and locate controls, the Agent Sigma button, and View companies / View jobs buttons.
+  - These are **UI only**: the buttons do nothing yet, the search doesn't filter, and the map is a locally drawn illustration, not a real map.
 
 ### Missing (planned)
+- Real map integration and list view content
 - Login / Signup and Profile
 - Guest mode and resume upload
 - Resume parsing and profile auto-fill
