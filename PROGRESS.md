@@ -1,7 +1,7 @@
 # Progress
 
-**Current phase:** Phase 1: Navigation and Opportunities screen UI, restyled to match the reference (waiting for review)
-**Current prompt:** #6
+**Current phase:** Phase 2: UI development — Recommended jobs UI and resume-to-recommendations flow (waiting for review)
+**Current prompt:** #13
 **Last updated:** 2026-10-24
 
 ## Locked feature scope
@@ -43,14 +43,37 @@ The core assessment requirements come first. Other features must not break them.
 - [x] Opportunities screen UI with local mock data (Prompt #3)
 - [x] Opportunities UI restyled to match the user's reference screenshot (Prompt #4)
 - [x] Swipe navigation between the Jobs tabs using material top tabs and pager-view; the UI is unchanged (Prompt #5)
+- [x] Recommended tab UI states: guest landing, loading, no matches, unavailable/error, job list (guest + signed-in variants) (Prompt #7)
+- [x] Resume flow screens: file picker → resume confirmation → profile processing → editable profile form with validation (Prompt #7)
+- [x] Session state (guest by default) and profile/recommendation state; header actions driven by session + profile (Prompt #7)
+- [x] State moved from React Context to Redux Toolkit: `src/store/` with `session` and `profile` slices and a `loadRecommendations` async thunk (Prompt #8)
+- [x] Service placeholder `parseResume` reports "not connected" instead of faking results (Prompt #7)
+- [x] **Mock** recommendations: `fetchRecommendations` returns 5 hardcoded sample jobs from `src/data/mockRecommendations.js`, on the user's request (Prompt #9)
+
+- [x] Sort sheet (Recommended / Aging / Fitment / Distance, with Distance disabled without data) and All Filters sheet (7 expandable sections, search, multi-select, counts, Clear all, Show N jobs); Verified, Last 24 hours and search filtering; filtered count in the tab label (Prompt #10)
+
+- [x] Job Details screen (guest locks / signed-in), opened from Recommended job cards; skill match insights, formatted description, fixed Apply button with missing-data states (Prompt #11)
+
+- [x] Profile tab (profile card, resume card, Experience and Education), Experience and Education lists with add, edit and delete, simulated resume parsing with sample data, and the resume flow reusable from Profile (Prompt #12)
+
+- [x] Profile screen add / edit icons made display-only, not clickable (Prompt #13)
 
 ### In progress
-- [ ] Review of the restyled UI and swipe navigation (Prompts #4 and #5)
+- [ ] Review of Prompts #7–#13
 
 ### Pending
-- [ ] Commit of the Prompt #3 and #4 changes. Prompt #3 files are staged by the user; Prompt #4 edits are unstaged.
+- [ ] Commit of the Prompt #7–#12 changes (waiting for approval)
+- [ ] Replace simulated resume parsing (`parseResume` MOCK) with the backend parser
+- [ ] All Jobs job list (needed to open Job Details from All Jobs)
+- [ ] Save job and email job for signed-in users (currently "Coming soon")
+- [ ] Distance sort: needs real user and job location data
+- [ ] Replace mock recommendations with the backend matching API
+- [ ] Backend: resume upload + parsing (BullMQ + Gemini) to back `parseResume`
+- [ ] Backend: recommendations API to back `fetchRecommendations`
+- [ ] Persisting the confirmed profile (currently in-memory only)
 - [ ] MongoDB connection and data models
-- [ ] Auth (Login/Signup)
+- [ ] Auth (Login/Signup) — the session slice's `signedIn` / `signedOut` actions are ready to be wired
+- [ ] Save job (signed-in) and Saved/Applied persistence
 - [ ] Seeded jobs, jobs list API with search
 - [ ] Jobs list view content, Job detail screen
 - [ ] Real map integration
@@ -70,6 +93,14 @@ The core assessment requirements come first. Other features must not break them.
 | 2026-10-24 | Restyled UI on emulator vs the reference screenshot (Prompt #4) | Passed: bundle built, no Metro errors; layout matches closely; the Applied tab scrolls into view |
 | 2026-10-24 | Jobs tab swipe on emulator (Prompt #5) | Passed: swipes in both directions across all 4 tabs; label taps still work; the chip row scrolls without changing tabs; expo-doctor 20/20 |
 | 2026-10-24 | Visual check of emulator vs the user's 4 phone screenshots (Prompt #6) | Passed: header, tabs, empty states, map and bottom nav match; no code changes needed. The only difference is the Expo Go dev-tools gear button (not app UI) |
+| 2026-10-24 | Prompt #7 checks: `expo-doctor`, `expo export --platform android`, no `.ts`/`.tsx` | Passed: 20/20, bundle built, 0 TS files |
+| 2026-10-24 | Prompt #7 guest flow on emulator with the real (unconnected) services | Passed: landing → system file picker → confirmation (real name + size) → honest "couldn't build your profile" → manual form → validation errors on empty submit → saved → Recommended shows "Recommendations aren't ready yet" + Sign up header |
+| 2026-10-24 | Prompt #7 states that need data, using a **temporary** test patch (reverted, 0 `TEMP-` markers left) | Passed: "Building Your Profile" in-progress view; "Agent Sigma is on the hunt" loading view; guest job cards with lock badges + sign-up prompt; signed-in cards without locks, name/email prefill, Learning entry from a gap chip, overflow chevron, cards without gaps/verified |
+| 2026-10-24 | Redux Toolkit migration (Prompt #8): `expo-doctor`, export, emulator flow | Passed: 20/20, bundle built, full resume flow + retry work through Redux |
+| 2026-10-24 | Mock recommendations (Prompt #9) on emulator | Passed: loading state, then Recommended (5) with job cards |
+| 2026-10-24 | Sort and filter sheets (Prompt #10) on emulator | Passed: Sort sheet and Fitment order; All Filters sections; Location multi-select + search; Company search; apply → Recommended (3) / All Filters (1); selections kept on reopen; Verified, Last 24 hours, search, no-match + Clear filters; other tabs open; expo-doctor 20/20 |
+| 2026-10-24 | Job Details (Prompt #11) on emulator | Passed: correct job shown; long description scrolls with a fixed Apply button; guest locks and sign-up prompts; Back keeps filters; no-URL and no-description states; signed-in: no locks, Learning link, Apply opens the URL (Chrome then crashed on its own first run). Not testable: opening from All Jobs (no job list) |
+| 2026-10-24 | Profile, Experience and Education (Prompt #12) on emulator | Passed: empty state → simulated flow → back to Profile; layout matches the references; Experience list, edit mode, add with validation, delete; Education add; edit profile and replace resume return to Profile; Jobs shows Recommended (5); no errors |
 | — | iOS device or simulator | **Not tested** (no macOS available) |
 | — | Physical Android device | **Not tested** |
 | — | Linting | **Not available**: no ESLint config in the project; none added to avoid extra dependencies |
@@ -78,13 +109,21 @@ The core assessment requirements come first. Other features must not break them.
 - The reference screenshot arrived with Prompt #4, and the UI was restyled to match it. Positions are estimates; it is not a pixel-perfect match.
 - Jobs tab swipe is enabled on All Jobs. The map is static now, so there is no gesture conflict. When a real map is added, disable swipe on All Jobs or limit it to non-map areas.
 - The mock company names (Kotak Mahindra, Accenture) and job count (186445) were taken from the reference screenshot and are placeholders.
-- Header buttons, map controls, Agent Sigma, and View Companies / View Jobs don't do anything yet (UI only). Search input and filter chips only update local state.
+- Map controls, Agent Sigma, share/notification icons and View Companies / View Jobs don't do anything yet (UI only). Search input and filter chips on the map only update local state. The header's Upload Resume now starts the resume flow (Prompt #7).
+- Prompt #7: only 4 distinct reference screenshots were received (2 of the 6 were duplicates). The guest landing (State 1) and the resume confirmation / processing screens (States 2–3) were built from the written description and need visual review.
+- **Resume parsing is SIMULATED** (Prompt #12): every resume "extracts" the same fictional sample profile after 3 s (`src/data/mockResume.js`). The processing steps are a UI-only timer.
+- Profile data (including experience and education) lives in memory only and is lost on app restart. Settings and resume download aren't available yet.
+- Filter options and counts come from the 5 mock jobs. Mock rec-1 has the location "Benhgaluru" (a typo edited into the working file), which shows as a separate Location option.
+- **Recommendations are MOCK data** (Prompt #9): every profile gets the same 5 hardcoded sample jobs. This is not AI matching and must be replaced before any claim of real recommendations.
+- Prompt #7: the profile, resume and recommendations live in memory only and are lost when the app restarts. A hardware Back on the profile form discards typed values without confirmation.
+- Prompt #7: there is no sign-in screen yet. "Sign up" opens the Profile tab placeholder; the signed-in UI could only be checked with a temporary test user.
+- Prompt #7: the "Use current location" icon on the profile form shows "coming soon" (location permissions are out of scope). Save on a signed-in job card is not wired yet.
 - The map is a static, locally drawn illustration. Marker positions are mock percentages, not real coordinates.
 - The Expo template added `frontend/AGENTS.md` and `frontend/.claude/settings.json`. `AGENTS.md` recommends Expo Router and TypeScript checks, which don't match this project (React Navigation, JavaScript only). Both files have been kept for now.
 - `npm install` in `frontend/` reports `npm audit` warnings in transitive dependencies. They have not been fixed, because `audit fix --force` could break SDK version pins.
 
 ## Remaining assessment deliverables
-- [ ] Source repository with regular Git commits (3 commits so far; Prompt #3 changes not yet committed)
+- [ ] Source repository with regular Git commits (5 commits so far; Prompt #7 changes not yet committed)
 - [ ] README with setup, technology choices, completed and missing features (keep updated)
 - [x] AI notes with tools, key prompts and one genuine AI mistake that was corrected (keep updating)
 - [ ] Working demo on a device or emulator (the UI runs on an Android emulator; core features still missing)

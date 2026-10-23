@@ -103,7 +103,6 @@ export const mapSummary = {
 };
 
 export const jobTabCounts = {
-  recommended: 0,
   saved: 0,
   applied: 0,
 };

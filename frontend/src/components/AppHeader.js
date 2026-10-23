@@ -3,10 +3,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, spacing, typography, TOUCH_TARGET } from '../theme';
 
+// `action` is the optional outlined pill next to the title
+// (e.g. { label: 'Upload Resume', onPress }).
 export default function AppHeader({
   title = 'Opportunities',
+  action,
+  showNotifications = true,
   notificationCount = 0,
-  onUploadResume,
   onShare,
   onNotifications,
 }) {
@@ -18,17 +21,19 @@ export default function AppHeader({
         {title}
       </Text>
 
-      <Pressable
-        onPress={onUploadResume}
-        accessibilityRole="button"
-        accessibilityLabel="Upload resume"
-        hitSlop={{ top: 6, bottom: 6 }}
-        style={({ pressed }) => [styles.uploadButton, pressed && styles.pressed]}
-      >
-        <Text style={styles.uploadText} numberOfLines={1}>
-          Upload Resume
-        </Text>
-      </Pressable>
+      {action && (
+        <Pressable
+          onPress={action.onPress}
+          accessibilityRole="button"
+          accessibilityLabel={action.label}
+          hitSlop={{ top: 6, bottom: 6 }}
+          style={({ pressed }) => [styles.uploadButton, pressed && styles.pressed]}
+        >
+          <Text style={styles.uploadText} numberOfLines={1}>
+            {action.label}
+          </Text>
+        </Pressable>
+      )}
 
       <View style={styles.actions}>
         <Pressable
@@ -40,21 +45,23 @@ export default function AppHeader({
           <Ionicons name="share-social-outline" size={24} color={colors.primary} />
         </Pressable>
 
-        <Pressable
-          onPress={onNotifications}
-          accessibilityRole="button"
-          accessibilityLabel={`Notifications, ${notificationCount} unread`}
-          style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
-        >
-          <Ionicons name="notifications-outline" size={24} color={colors.textMuted} />
-          {notificationCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {notificationCount > 9 ? '9+' : notificationCount}
-              </Text>
-            </View>
-          )}
-        </Pressable>
+        {showNotifications && (
+          <Pressable
+            onPress={onNotifications}
+            accessibilityRole="button"
+            accessibilityLabel={`Notifications, ${notificationCount} unread`}
+            style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
+          >
+            <Ionicons name="notifications-outline" size={24} color={colors.textMuted} />
+            {notificationCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {notificationCount > 9 ? '9+' : notificationCount}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        )}
       </View>
     </View>
   );

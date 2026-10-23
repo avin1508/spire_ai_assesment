@@ -1,9 +1,15 @@
 import { StyleSheet, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import AppHeader from '../components/AppHeader';
 import JobsTabBar from '../components/JobsTabBar';
 import OpportunitiesScreen from '../screens/OpportunitiesScreen';
+import RecommendedScreen from '../screens/RecommendedScreen';
 import PlaceholderScreen from '../screens/PlaceholderScreen';
+import { useSelector } from 'react-redux';
+import { selectIsGuest } from '../store/sessionSlice';
+import { selectProfile, selectRecommendations } from '../store/profileSlice';
+import useResumeUpload from '../hooks/useResumeUpload';
 import { jobTabCounts, unreadNotifications } from '../data/mockMap';
 import { colors } from '../theme';
 
@@ -13,9 +19,31 @@ import { colors } from '../theme';
 const JobsTab = createMaterialTopTabNavigator();
 
 export default function JobsNavigator() {
+  const navigation = useNavigation();
+  const isGuest = useSelector(selectIsGuest);
+  const profile = useSelector(selectProfile);
+  const recommendations = useSelector(selectRecommendations);
+  const startResumeUpload = useResumeUpload();
+
+  // Header actions follow the session: guests without a profile are asked for
+  // a resume, guests with one are asked to sign up, signed-in users get neither.
+  let headerAction = null;
+  if (isGuest) {
+    headerAction = profile
+      ? { label: 'Sign up', onPress: () => navigation.navigate('Profile') }
+      : { label: 'Upload Resume', onPress: startResumeUpload };
+  }
+  const recommendedCount =
+    recommendations.status === 'ready' ? recommendations.items.length : 0;
+
   return (
     <View style={styles.container}>
-      <AppHeader title="Opportunities" notificationCount={unreadNotifications} />
+      <AppHeader
+        title="Opportunities"
+        action={headerAction}
+        showNotifications={!(isGuest && profile)}
+        notificationCount={unreadNotifications}
+      />
       <JobsTab.Navigator
         initialRouteName="AllJobs"
         tabBar={(props) => <JobsTabBar {...props} />}
@@ -23,13 +51,8 @@ export default function JobsNavigator() {
       >
         <JobsTab.Screen
           name="Recommended"
-          component={PlaceholderScreen}
-          options={{ title: `Recommended (${jobTabCounts.recommended})` }}
-          initialParams={{
-            title: 'Recommended',
-            icon: 'star-outline',
-            message: 'Upload your resume to get AI-based job recommendations.',
-          }}
+          component={RecommendedScreen}
+          options={{ title: `Recommended (${recommendedCount})` }}
         />
         <JobsTab.Screen
           name="AllJobs"

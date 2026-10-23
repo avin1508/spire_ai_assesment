@@ -1,6 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import JobsNavigator from './JobsNavigator';
+import ProfileNavigator from './ProfileNavigator';
 import PlaceholderScreen from '../screens/PlaceholderScreen';
 import { colors } from '../theme';
 
@@ -45,11 +46,7 @@ export default function RootNavigator() {
         component={PlaceholderScreen}
         initialParams={{ icon: 'book-outline', message: 'Learning resources are coming soon.' }}
       />
-      <Tab.Screen
-        name="Profile"
-        component={PlaceholderScreen}
-        initialParams={{ icon: 'person-outline', message: 'Login and your profile are coming soon.' }}
-      />
+      <Tab.Screen name="Profile" component={ProfileNavigator} options={{ headerShown: false }} />
     </Tab.Navigator>
   );
 }
