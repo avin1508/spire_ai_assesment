@@ -1,0 +1,53 @@
+# Local development: the backend API (auto-reload) plus Redis. MongoDB stays on Atlas.
+#
+#   docker compose up --build -d
+#   curl http://localhost:5000/health
+#   docker compose down
+#
+# Production: see docker-compose.prod.yml.
+
+# Explicit project name: the default (the folder name, "backend") is too generic
+# and would clash with other Compose projects in folders called "backend".
+name: spire-ai
+
+services:
+  redis:
+    image: redis:8.2.10-alpine
+    # Published on 127.0.0.1 only, so `npm run dev` on the host can also use it
+    # (REDIS_URL=redis://localhost:6379) without exposing Redis to the network.
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    # DB_* credentials come from backend/.env at runtime; they are not in the image.
+    env_file: .env
+    environment:
+      PORT: 5000
+      # The Compose service name is the hostname inside the Docker network.
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "${BACKEND_HOST_PORT:-5000}:5000"
+    # Code changes in ./src restart the server (nodemon) without a rebuild.
+    volumes:
+      - ./src:/app/src:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    # Runs a tiny init process so `docker compose stop` shuts Node down promptly.
+    init: true
+    restart: unless-stopped

@@ -70,7 +70,19 @@ The core assessment requirements come first. Other features must not break them.
   - The seed has a reconciliation report and `--dry-run`.
   - 500 jobs in `spire_db.jobs`; 20 backend tests.
 
+- [x] **Backend containerization + Redis connection** (Prompt #26):
+  - `Dockerfile`, `.dockerignore`, and `docker-compose.yml` (project `spire-ai`) with the backend plus `redis:8.2-alpine`, health checks, and the backend waiting for a healthy Redis.
+  - The backend connects to Redis through `REDIS_URL` (optional) using the `redis` client.
+  - `/health` reports `redis`.
+  - 22 backend tests.
+
+- [x] **Production Docker setup** (Prompt #27):
+  - `Dockerfile.prod`: multi-stage, production deps only, non-root, HEALTHCHECK.
+  - `docker-compose.prod.yml` (project `spire-ai-prod`): Redis with a password, not published, persisted with AOF; read-only backend filesystem; restart always; memory limits; log rotation.
+  - The development setup now uses `Dockerfile.dev` (nodemon, `./src` mounted). The old `Dockerfile` was replaced.
+
 ### In progress
+- [ ] Review of the Docker + Redis setup (Prompts #26–#27)
 - [ ] Review of the Job model refactor and 500-job seed (Prompt #24)
 - [ ] Jobs API (list/search/filter/sort, details, map) — not started; waiting for approval
 - [ ] Review of Prompts #14–#15
@@ -122,6 +134,12 @@ The core assessment requirements come first. Other features must not break them.
 | 2026-10-24 | `npm run seed:jobs -- --dry-run`, then seed twice (Prompt #24) | Passed: dry run showed 0 existing / 500 to insert. Run 1: inserted 500, invalid 0. Run 2: inserted 0, updated 0, unchanged 500; total 500 |
 | 2026-10-24 | Atlas read-back (Prompt #24) | Passed: 500 docs, 500 unique jobIds, 0 schema errors, geo matches lat/lng, all within 35 km of their city, content matches the dataset, frontend `validateJobs` accepts all 500 converted jobs, 2dsphere `$near` query works |
 | 2026-10-24 | State check (Prompt #25) | Passed: Atlas 500 jobs, 500 unique jobIds, 0 duplicates, 0 missing required fields, 0 schema errors; backend `npm test` 20/20; `/health` → `{"status":"ok","database":"connected"}`; no credentials in the working tree |
+| 2026-10-24 | Docker Compose stack (Prompt #26) | Passed: `docker compose config` valid; image built; redis and backend both `(healthy)`; `/health` from host → `{"status":"ok","database":"connected","redis":"connected"}`; backend container PING via hostname `redis` → PONG; `.env` not in image, no DB_* in image env; Atlas count still 500 |
+| 2026-10-24 | Redis failure handling (Prompt #26) | Passed: Redis stopped → `/health` 503 `redis: "connecting"`; Redis restarted → client reconnected, 200. Unreachable `REDIS_URL` at startup → exits 1 after 5 attempts. Host run without `REDIS_URL` → `redis: "not_configured"`, 200; host run with `redis://localhost:6379` → connected |
+| 2026-10-24 | Backend `npm test` (Prompt #26) | Passed: 22/22 |
+| 2026-10-24 | Development Compose (Prompt #27) | Passed: both containers (healthy); `/health` connected/connected; `NODE_ENV=development`; touching `src/server.js` → nodemon restarted, then healthy again |
+| 2026-10-24 | Production Compose (Prompt #27) | Passed: missing `REDIS_PASSWORD` → Compose refuses; with a password both containers (healthy); `/health` connected/connected; Redis port not reachable from the host; `redis-cli ping` without a password → NOAUTH, with it → PONG; appendonly yes; backend runs as `node`, read-only filesystem, no nodemon, `NODE_ENV=production`; restart=always, memory limits and log rotation applied; recovered after a Redis restart; password not in the image |
+| 2026-10-24 | Backend `npm test` (Prompt #27) | Passed: 22/22 |
 | — | iOS device or simulator | **Not tested** (no macOS available) |
 | — | Physical Android device | **Not tested** |
 | — | Linting | **Not available**: no ESLint config in the project; none added to avoid extra dependencies |
@@ -146,6 +164,8 @@ The core assessment requirements come first. Other features must not break them.
 - Prompt #24: the user deleted the 120 Prompt #23 jobs on purpose before the new seed, so the collection was empty as expected. The 500-job seed reuses all of their jobIds.
 - Prompt #24: `postedAt` is set once on first insert, so "Last 24 hours" / aging counts shrink over time (14 jobs were in the last 24 hours at seed time). Re-dating needs a deliberate option; it is not done automatically.
 - Prompt #24: the app still uses its local 120 mock jobs. The 500 seeded jobs appear only once the Jobs API exists.
+
+- Prompt #27: the production Compose setup is single-host with no HTTPS or reverse proxy; one is needed before exposing port 5000 to the internet. The Redis password is visible to anyone who can run `docker inspect` on that host (environment variables). Development Redis has no persistence.
 
 ## Remaining assessment deliverables
 - [ ] Source repository with regular Git commits (5 commits so far; Prompt #7 changes not yet committed)

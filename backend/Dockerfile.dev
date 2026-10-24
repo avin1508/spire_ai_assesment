@@ -1,0 +1,19 @@
+# Development image for the backend API (used by docker-compose.yml).
+# Includes dev dependencies (nodemon); docker-compose.yml mounts ./src so code
+# changes restart the server without rebuilding the image.
+FROM node:22.21.1-alpine
+
+WORKDIR /app
+ENV NODE_ENV=development
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY src ./src
+
+USER node
+EXPOSE 5000
+
+# --legacy-watch (polling): file-change events from a Windows bind mount don't
+# reach the Linux container reliably.
+CMD ["npx", "nodemon", "--legacy-watch", "src/server.js"]

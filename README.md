@@ -16,7 +16,7 @@ Practical assessment project: a job-matching mobile app. Users can upload a resu
 | Backend API | Node.js + Express 5, JavaScript ES modules | Initialized |
 | Database | MongoDB Atlas + Mongoose 9 | `Job` model (`src/models/job.model.js`); 500 demo jobs seeded |
 | AI | Gemini API | Not started |
-| Background jobs | BullMQ + Redis | Not started |
+| Background jobs | BullMQ + Redis | Redis runs in Docker Compose and the backend connects to it; BullMQ not started |
 | Push notifications | Firebase Cloud Messaging (FCM) | Not started |
 
 The project uses JavaScript only, with no TypeScript.
@@ -44,13 +44,18 @@ spire_ai/
 │       └── data/              # mockMap.js (All Jobs map), mockRecommendations.js (sample recommended jobs)
 ├── backend/           # Express API
 │   ├── src/
-│   │   ├── server.js          # loads .env, connects to MongoDB, then listens
-│   │   ├── config/            # env.js (reads DB_* vars), db.js (connect / disconnect / state)
+│   │   ├── server.js          # loads .env, connects to MongoDB (and Redis if configured), then listens
+│   │   ├── config/            # env.js (reads env vars), db.js (MongoDB), redis.js (Redis client)
 │   │   ├── models/            # job.model.js (Job schema, enums, indexes)
 │   │   ├── data/              # 500-job demo dataset: cities.js, companies.js, roles.js, jobs.dataset.js
 │   │   ├── seed/              # jobTransform.js (validation, DB document ↔ frontend job shape)
 │   │   └── scripts/           # seedJobs.js
 │   ├── tests/                 # node --test
+│   ├── Dockerfile.dev         # development image (all deps, nodemon auto-reload)
+│   ├── Dockerfile.prod        # production image (multi-stage, production deps only, non-root, health check)
+│   ├── docker-compose.yml     # development: backend + Redis (project name: spire-ai)
+│   ├── docker-compose.prod.yml  # production: backend + password-protected, persistent Redis (project: spire-ai-prod)
+│   ├── .dockerignore          # keeps .env, node_modules and tests out of the image
 │   ├── .env.example
 │   └── package.json
 ├── AI_NOTES.md        # Log of AI-assisted prompts
@@ -78,6 +83,52 @@ npm run dev            # start with nodemon (auto-reload)
 npm start              # start with node
 ```
 
+### Backend with Docker — development (backend + Redis)
+
+You need Docker Desktop running. Redis doesn't need to be installed on Windows; it runs from the official `redis:8.2.10-alpine` image. The development image runs nodemon, and `./src` is mounted, so code changes restart the server without a rebuild.
+
+```bash
+cd backend
+cp .env.example .env              # fill in the DB_* values (MongoDB stays on Atlas)
+docker compose up --build -d      # builds the API image, starts Redis, then the API once Redis is healthy
+docker compose ps                 # both services should show (healthy)
+curl http://localhost:5000/health # {"status":"ok","database":"connected","redis":"connected"}
+docker compose logs -f backend    # follow the API logs
+docker compose down               # stop and remove the containers
+```
+
+- In Compose, the backend reaches Redis at `redis://redis:6379`, using the service name, not `localhost`.
+- Redis is also published on `127.0.0.1:6379` only. To use it from `npm run dev` on the host, run `docker compose up -d redis` and set `REDIS_URL=redis://localhost:6379` in `.env`.
+- **Ports:** if port 5000 is already in use (for example by `npm run dev`), choose another host port.
+  - Git Bash: `BACKEND_HOST_PORT=5080 docker compose up -d`
+  - PowerShell: `$env:BACKEND_HOST_PORT=5080; docker compose up -d`
+  - `REDIS_HOST_PORT` works the same way for Redis.
+- **Secrets:** `.env` is never copied into the image. Compose passes it to the container at runtime with `env_file`.
+
+### Backend with Docker — production
+
+`docker-compose.prod.yml` builds `Dockerfile.prod`: a multi-stage build with production dependencies only, running as the non-root `node` user, with a built-in health check. It uses a separate project name (`spire-ai-prod`), so it never replaces the development containers. It also needs `REDIS_PASSWORD` in `backend/.env`, made of letters and digits only (for example `openssl rand -hex 32`); Compose refuses to start without it.
+
+```bash
+cd backend
+docker compose -f docker-compose.prod.yml up --build -d
+docker compose -f docker-compose.prod.yml ps        # both (healthy)
+curl http://localhost:5000/health
+docker compose -f docker-compose.prod.yml logs -f backend
+docker compose -f docker-compose.prod.yml down      # keeps Redis data; add -v to delete it
+```
+
+| | Development (`docker-compose.yml`) | Production (`docker-compose.prod.yml`) |
+| --- | --- | --- |
+| Image | `Dockerfile.dev`: all deps, nodemon | `Dockerfile.prod`: multi-stage, production deps only |
+| Source code | `./src` mounted, auto-reload | Baked into the image; read-only filesystem |
+| Redis access | Published on `127.0.0.1:6379`, no password | Not published; password required (`REDIS_PASSWORD`) |
+| Redis data | Not persisted | Named volume `redis-data`, append-only file |
+| Restart policy | `unless-stopped` | `always` |
+| Limits and logs | None | Memory limits (backend 512 MB, Redis 256 MB); log rotation 3 × 10 MB |
+
+This is a single-host production setup. There is no HTTPS or reverse proxy yet: put one (for example nginx or a cloud load balancer) in front of port 5000 before exposing it to the internet.
+
 ### Frontend (`frontend/`)
 
 ```bash
@@ -100,8 +151,10 @@ Backend variables live in `backend/.env`. Copy them from [backend/.env.example](
 | `DB_PASSWORD` | — | Its password (URL-encoded automatically; never logged) |
 | `DB_CLUSTER_URL` | — | Atlas cluster host, e.g. `cluster0.xxxxx.mongodb.net` |
 | `DB_NAME` | — | Database name (`spire_db`) |
+| `REDIS_URL` | empty | Optional. Empty means the server runs without Redis. When it's set, the server won't start unless Redis answers. Compose sets it to `redis://redis:6379` (with the password in production) |
+| `REDIS_PASSWORD` | — | Production Compose only: the Redis password (letters and digits only) |
 
-More variables (Gemini key, Redis URL, Firebase credentials) will be added as those features are built.
+More variables (Gemini key, Firebase credentials) will be added as those features are built.
 
 ### Seeding the jobs
 
@@ -135,7 +188,7 @@ Google sign-in doesn't work in Expo Go. It needs a development build or APK (`np
 
 | Method | Path | Response |
 | --- | --- | --- |
-| GET | `/health` | `200 { "status": "ok", "database": "connected" }`, or `503 { "status": "degraded", "database": "disconnected" }` |
+| GET | `/health` | `200 { "status": "ok", "database": "connected", "redis": "connected" }` (`redis` is `"not_configured"` without `REDIS_URL`), or `503 { "status": "degraded", … }` when MongoDB or a configured Redis isn't connected |
 
 ## Testing
 
@@ -161,7 +214,7 @@ Manual checks:
 ```bash
 # Backend: start the server, then:
 curl http://localhost:5000/health
-# expected: {"status":"ok","database":"connected"}
+# expected: {"status":"ok","database":"connected","redis":"not_configured"}  (or "connected" with REDIS_URL / Docker)
 
 # Frontend: start Expo, then check the bundle builds:
 cd frontend && npm start

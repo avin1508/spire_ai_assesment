@@ -2153,3 +2153,109 @@ one correction need to if the user will not login na so he can not apply ok add 
 
 ### Mistakes and fixes
 - In Prompt #24 I treated the deliberately emptied collection as an unexpected deletion and investigated it. Corrected in PROGRESS and the Prompt #24 notes.
+
+## Prompt #26: Containerize the backend and connect Redis
+
+- **Date/time:** 2026-10-24, about 18:20–18:50 IST
+- **AI tool:** Claude
+- **Exact prompt:** "## Current task: Containerize the backend and connect Redis":
+  - Dockerfile, plus docker-compose.yml with the backend API and the official Redis image;
+  - `REDIS_URL` configuration, using the service name (not localhost) inside Compose;
+  - no Redis install on Windows;
+  - health checks and readiness;
+  - `.dockerignore` / `.env.example`, with no secrets in the image;
+  - keep MongoDB Atlas and current behaviour; verify Atlas, Redis, `/health` and tests.
+  - Out of scope: Jobs APIs, frontend, caching/BullMQ/workers, production Compose, data changes.
+
+### Inspected first
+- **Backend:** Express 5 ESM; `server.js` connects MongoDB and then listens; config in `src/config/env.js` / `db.js`; `.gitignore` already ignores `.env`; no Docker files existed.
+- **Docker:** Docker 29.2.1 / Compose 5.1.0 were installed but the engine was stopped; I started Docker Desktop.
+
+### Changes
+- **New:** `backend/Dockerfile`, `backend/.dockerignore`, `backend/docker-compose.yml`, `backend/src/config/redis.js`, `backend/tests/redis.test.js`.
+- **Modified:**
+  - `backend/src/config/env.js`: `getRedisUrl`, `describeRedisTarget`.
+  - `backend/src/server.js`: connects Redis after MongoDB; `/health` adds `redis`.
+  - `backend/package.json` / `package-lock.json`: `redis` ^6.3.0.
+  - `backend/.env.example`: `REDIS_URL=` placeholder.
+  - README, PROGRESS, AI_NOTES.
+- **Dockerfile:** `node:22-alpine`; `npm ci --omit=dev`; copies only `src`; runs as `node` (non-root).
+- **Compose:**
+  - Project name `spire-ai`.
+  - `redis:8.2-alpine`, published on 127.0.0.1 only, health check `redis-cli ping`.
+  - Backend: `env_file: .env` (runtime only); `REDIS_URL=redis://redis:6379`; `depends_on` redis `service_healthy`; health check calls `/health` with Node's `fetch`; `init: true`.
+  - Host ports configurable through `BACKEND_HOST_PORT` / `REDIS_HOST_PORT`.
+- **Redis config:**
+  - `REDIS_URL` is optional so plain `npm run dev` behaves as before.
+  - When it's set, startup fails after 5 attempts if Redis is unreachable; after the first connection, the client reconnects with capped backoff.
+  - Logs show `redis://host:port` only, without credentials.
+
+### Verification (actually run)
+- `npm test` (backend): **22/22 passed** (20 existing + 2 new).
+- **Host run without `REDIS_URL`:** `{"status":"ok","database":"connected","redis":"not_configured"}` (HTTP 200), so existing behaviour is unchanged.
+- **Compose:**
+  - `docker compose config --quiet` valid; `docker compose up --build -d` (host port 5080, because 5000 was in use); both containers `(healthy)`.
+  - Logs: MongoDB connected → Redis connected (`redis://redis:6379`) → listening.
+  - `/health` from Windows: `{"status":"ok","database":"connected","redis":"connected"}`.
+  - PING from inside the backend container using hostname `redis`: PONG.
+- **Failure handling:**
+  - Redis stopped → `/health` 503 `redis: "connecting"`; restarted → "Redis reconnected", 200.
+  - Unreachable `REDIS_URL` at startup → "Redis connection failed: gave up after 5 attempts", exit 1.
+- **Host `npm`-style run with `REDIS_URL=redis://localhost:6379`** (Compose Redis): connected.
+- **Secrets:** `.env` absent from the image; image env has only PATH/NODE_VERSION/YARN_VERSION/NODE_ENV; the real password is in none of the new or changed files.
+- **MongoDB:** read-only count from inside the container: 500 jobs (unchanged).
+
+### Mistakes and fixes
+- **Compose project-name collision.**
+  - The first `docker compose up` used the default project name `backend` (the folder name). Another, unrelated Compose project of the user's also used `backend`, so Compose **recreated its two containers** (`backend-redis-1`, `backend-backend-1`) with mine, and my build took over its `backend-backend` image tag.
+  - **Fix:** set `name: spire-ai` in the Compose file, removed only the two containers I had created, and removed my `backend-backend:latest` tag so that project won't run my image.
+  - Its data volume `backend_redis-data` was never mounted or deleted. Running `docker compose up --build` in that project's folder recreates its containers.
+- The first fail-fast log line was an empty `Redis error:` because on Windows a refused `localhost` connection is an `AggregateError` with no message. The error text now falls back to the inner errors and codes.
+
+## Prompt #27: Production Dockerfile and production Compose
+
+- **Date/time:** 2026-10-24, about 19:00–19:25 IST
+- **AI tool:** Claude
+- **Exact prompt:** "prod docker file and prod compose is missing"
+
+### Decision
+- The Prompt #26 `Dockerfile` was already production-style but was used by the development Compose file. I split the setup into a clear pair:
+  - **Development:** `Dockerfile.dev` + `docker-compose.yml`.
+  - **Production:** `Dockerfile.prod` + `docker-compose.prod.yml`.
+- The old `Dockerfile` (uncommitted, from Prompt #26) was removed.
+
+### Changes
+- **New:**
+  - `backend/Dockerfile.prod`: `node:22.21.1-alpine`; a deps stage runs `npm ci --omit=dev`; the runtime stage copies `node_modules`, `package.json` and `src` owned by `node`, runs as `USER node`, and has a HEALTHCHECK on `/health`.
+  - `backend/Dockerfile.dev`: `npm ci` with dev deps; `npx nodemon --legacy-watch` (polling, because bind-mount events from Windows don't reach the container).
+  - `backend/docker-compose.prod.yml`:
+    - Project `spire-ai-prod`.
+    - Redis `8.2.10-alpine` with `--requirepass` from `REDIS_PASSWORD` (required: `${REDIS_PASSWORD:?…}`), `--appendonly yes`, `redis-data` volume, no published port, health check using `REDISCLI_AUTH`.
+    - Backend: `REDIS_URL=redis://:<password>@redis:6379`; `depends_on` healthy Redis; `read_only` + `tmpfs /tmp`; `init`.
+    - Both: `restart: always`, memory limits (512m / 256m), json-file log rotation.
+- **Modified:**
+  - `backend/docker-compose.yml`: `Dockerfile.dev`, `./src` mounted read-only, Redis pinned to `8.2.10-alpine`.
+  - `backend/.dockerignore`: `Dockerfile*`, `docker-compose*.yml`.
+  - `backend/.env.example`: `REDIS_PASSWORD=` placeholder.
+  - README (development and production sections plus a comparison table), PROGRESS, AI_NOTES.
+
+### Verification (actually run)
+- `docker compose config --quiet` is valid for both files. The production file without `REDIS_PASSWORD` fails with "Set REDIS_PASSWORD in backend/.env".
+- **Development:**
+  - Both containers `(healthy)`; `/health` → `{"status":"ok","database":"connected","redis":"connected"}`; `NODE_ENV=development`, nodemon present.
+  - `touch src/server.js` → "[nodemon] restarting due to changes", then healthy again.
+- **Production** (random `REDIS_PASSWORD` set only in the shell, never written or printed):
+  - Both containers `(healthy)`; `/health` → connected/connected; logs show `redis://redis:6379` without the password.
+  - Port 6379 closed on the host.
+  - `redis-cli ping` without auth → `NOAUTH Authentication required.`; with auth → PONG; `appendonly yes`.
+  - Backend: user `node`, `NODE_ENV=production`, nodemon absent, writing to `/app` → "Read-only file system".
+  - `docker inspect`: restart=always, memory 512 MB / 256 MB, log max-size 10m.
+  - Image `spire-ai-backend:prod` is 266 MB, with only PATH/NODE_VERSION/YARN_VERSION/NODE_ENV in its env; the password appears 0 times in the image metadata.
+  - After `restart redis`, the backend reconnected (200).
+  - The test stack was removed with `down -v` (its volume was created only for this test; I checked that no `spire-ai-prod` resources existed before).
+- `npm test` (backend): 22/22.
+
+### Limitations
+- Single host only; no HTTPS or reverse proxy yet.
+- The Redis password is an environment variable, so anyone with `docker inspect` access on the host can see it. Docker secrets or a secrets manager would be the next step.
+- `restart: always` restarts the production stack whenever Docker starts, until it's taken down.

@@ -33,3 +33,20 @@ export function buildMongoUri({ username, password, clusterUrl, dbName }) {
 export function describeMongoTarget({ username, clusterUrl, dbName }) {
   return `${username}@${clusterUrl}/${dbName}`;
 }
+
+// Optional: Redis is used only when REDIS_URL is set
+// (redis://redis:6379 in Docker Compose, redis://localhost:6379 from the host).
+export function getRedisUrl() {
+  const value = process.env.REDIS_URL?.trim();
+  return value || null;
+}
+
+// Safe for logs: scheme, host, port and database number, without credentials.
+export function describeRedisTarget(url) {
+  try {
+    const { protocol, hostname, port, pathname } = new URL(url);
+    return `${protocol}//${hostname}:${port || 6379}${pathname.length > 1 ? pathname : ''}`;
+  } catch {
+    return 'invalid REDIS_URL';
+  }
+}
