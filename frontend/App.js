@@ -13,6 +13,7 @@ import { refreshRecommendations } from './src/store/profileSlice';
 import { subscribeToNotificationTaps } from './src/notifications/push';
 import { notificationTarget } from './src/utils/pushNotifications';
 import GuestLoginSheet from './src/components/GuestLoginSheet';
+import NotificationPromptSheet from './src/components/NotificationPromptSheet';
 import { navigationRef } from './src/navigation/navigationRef';
 import { colors } from './src/theme';
 
@@ -75,6 +76,8 @@ function AppContent() {
       <AppNavigator />
       {/* The one shared login sheet, opened from any screen via useRequireAuth. */}
       <GuestLoginSheet />
+      {/* "Get notified" before Android's notification permission dialog. */}
+      <NotificationPromptSheet />
     </NavigationContainer>
   );
 }

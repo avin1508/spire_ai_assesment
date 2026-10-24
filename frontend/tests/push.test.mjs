@@ -3,7 +3,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { notificationTarget, permissionState, shouldAskPermission, shouldRegister } from '../src/utils/pushNotifications.js';
+import { PERMISSION_PROMPT_COOLDOWN_MS, notificationTarget, permissionState, shouldOfferPermission, shouldRegister } from '../src/utils/pushNotifications.js';
 
 describe('permission and registration', () => {
   const base = { supported: true, permission: 'granted', token: 'fcm-token-1', owner: 'guest', registered: null };
@@ -15,11 +15,21 @@ describe('permission and registration', () => {
     assert.equal(permissionState({ status: 'granted', canAskAgain: true }), 'granted');
   });
 
-  test('permission is asked only after a profile is confirmed, and only once', () => {
-    assert.equal(shouldAskPermission({ supported: true, permission: 'undetermined', reason: 'profile_confirmed' }), true);
-    assert.equal(shouldAskPermission({ supported: true, permission: 'undetermined', reason: 'owner' }), false, 'not on start-up / sign-in');
-    assert.equal(shouldAskPermission({ supported: true, permission: 'denied', reason: 'profile_confirmed' }), false, 'a refusal is respected');
-    assert.equal(shouldAskPermission({ supported: false, permission: 'undetermined', reason: 'profile_confirmed' }), false, 'Expo Go / iOS');
+  test('notifications are offered only after a profile is confirmed, while still undecided', () => {
+    const offer = { supported: true, permission: 'undetermined', reason: 'profile_confirmed', dismissedAt: null };
+    assert.equal(shouldOfferPermission(offer), true);
+    assert.equal(shouldOfferPermission({ ...offer, reason: 'owner' }), false, 'not on start-up / sign-in');
+    assert.equal(shouldOfferPermission({ ...offer, permission: 'granted' }), false, 'already allowed');
+    assert.equal(shouldOfferPermission({ ...offer, permission: 'denied' }), false, 'blocked by the system: never nag');
+    assert.equal(shouldOfferPermission({ ...offer, supported: false }), false, 'Expo Go / iOS');
+  });
+
+  test('"Not now" is respected for a week', () => {
+    const now = Date.UTC(2026, 9, 25);
+    const offer = { supported: true, permission: 'undetermined', reason: 'profile_confirmed', now };
+    assert.equal(shouldOfferPermission({ ...offer, dismissedAt: now - 3600000 }), false, 'an hour ago');
+    assert.equal(shouldOfferPermission({ ...offer, dismissedAt: now - PERMISSION_PROMPT_COOLDOWN_MS + 1 }), false);
+    assert.equal(shouldOfferPermission({ ...offer, dismissedAt: now - PERMISSION_PROMPT_COOLDOWN_MS }), true, 'after 7 days');
   });
 
   test('a guest device registers once; nothing without permission, token or support', () => {

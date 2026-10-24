@@ -217,3 +217,4 @@ The core assessment requirements come first. Other features must not break them.
 - [x] **Push notifications for finished recommendations** (Prompt #47): device registration per owner, at-most-once FCM send after completion, tap → Recommended. Tests: backend 160, frontend 48.
   - [ ] Real delivery: needs a Firebase service-account key (`FIREBASE_SERVICE_ACCOUNT_FILE`) and an Android development build.
 - [x] **Real push delivery verified** (Prompt #48): key file auto-detected and mounted read-only; Android development build; guest and logged-in pushes received and tapped on the emulator. Tests: backend 162, frontend 49.
+- [x] **Notification permission soft-ask** (Prompt #50): own explanation sheet after profile confirm, system dialog only on "Notify me", 7-day "Not now" cool-down; verified on the dev build.

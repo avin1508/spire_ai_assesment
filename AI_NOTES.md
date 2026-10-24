@@ -2692,3 +2692,24 @@ Real delivery and tapping a real notification were not verified. Blockers:
 - **Cause:** `store/pushRegistration.js` chained registration steps on a promise without a `catch`. A step that threw rejected the chain unhandled; the Metro log showed "Uncaught (id: 0)" then "Promise rejection handled (id: 0)" when the next step was chained. The throwing call was most likely an old function reference after Fast Refresh, while I moved `permissionState` between files during verification.
 - **Fix:** the chain now ends in `.catch()`, which logs `[push] sync failed` (message + short stack) and keeps the next step working.
 - **Verified:** dev build restarted, login + logout as the test account; the device moved to the new guest, no error and no red box. Frontend tests 49/49.
+
+## Prompt #50: When to ask for notification permission (soft-ask)
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Exact prompt:** "ek or chig permission kab lena chchiye or ham kab le rahe hai professionaly adjust karo na esko"
+- **Before:** Android's system dialog appeared straight after "Done" on Profile Confirm, with no explanation. A refusal there can block the permission for good (Android 13+ stops showing the dialog after repeated denials).
+- **Now:**
+  - after a profile is confirmed, while the recommendations are being prepared, our own sheet (`NotificationPromptSheet`) explains the benefit: [Notify me] [Not now];
+  - the system dialog appears only after "Notify me";
+  - "Not now" is respected for 7 days (device preference `spire:device:pushPromptDismissedAt:v1`);
+  - never on start-up, never once granted or blocked by the system;
+  - if already granted, the device simply registers.
+  - Rule: `shouldOfferPermission` (pure, unit-tested).
+- **Verified (dev build, permission reset to never-asked):**
+  - no prompt on start-up;
+  - sheet after Done;
+  - "Notify me" → system dialog → Allow → granted, and the device registered to the guest;
+  - "Not now" → no system dialog; the next profile confirm shows no sheet (cooldown).
+  - Permission restored afterwards.
+- **Tests:** frontend 50/50; Android bundle OK.
