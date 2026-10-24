@@ -5,6 +5,7 @@ import { RESUME_QUEUE, createRedisClient } from '../queue/resumeQueue.js';
 import { extractResumeText } from '../services/resumeText.js';
 import { normalizeExtractedProfile } from '../services/resumeProfile.js';
 import { ResumeProcessingError, resumeError } from '../services/resumeErrors.js';
+import { estimateTokens } from '../services/geminiQuota.js';
 
 // Processes one resume-parse job:
 //   stored file → text (extracting_text) → Gemini (analyzing)
@@ -17,7 +18,8 @@ import { ResumeProcessingError, resumeError } from '../services/resumeErrors.js'
 const toProcessingError = (error) =>
   error instanceof ResumeProcessingError ? error : resumeError('processing_failed');
 
-export function createResumeProcessor({ extractProfile }) {
+// `quota` (optional): the shared Gemini guard (services/geminiQuota.js).
+export function createResumeProcessor({ extractProfile, quota }) {
   return async function processResume(job) {
     const { resumeId } = job.data;
     const doc = await Resume.findById(resumeId);
@@ -39,7 +41,19 @@ export function createResumeProcessor({ extractProfile }) {
       const text = await extractResumeText(doc.kind, buffer);
 
       await setStage('analyzing');
-      const raw = await extractProfile(text);
+      if (quota) {
+        const gate = await quota.acquire(estimateTokens(text));
+        if (!gate.ok) throw resumeError('ai_busy'); // retried by the queue with backoff
+      }
+      let raw;
+      try {
+        raw = await extractProfile(text);
+        await quota?.recordSuccess();
+      } catch (error) {
+        if (error?.code === 'ai_busy') await quota?.recordFailure(error.original ?? error, { rateLimited: true });
+        else if (error?.code === 'ai_unavailable' || error?.code === 'ai_timeout') await quota?.recordFailure(error.original ?? error);
+        throw error;
+      }
 
       await setStage('building_profile');
       const profile = normalizeExtractedProfile(raw, `r${String(doc._id)}`);
@@ -71,8 +85,8 @@ export function createResumeProcessor({ extractProfile }) {
   };
 }
 
-export function startResumeWorker({ extractProfile, concurrency = 2 }) {
-  const worker = new Worker(RESUME_QUEUE, createResumeProcessor({ extractProfile }), {
+export function startResumeWorker({ extractProfile, quota, concurrency = 2 }) {
+  const worker = new Worker(RESUME_QUEUE, createResumeProcessor({ extractProfile, quota }), {
     connection: createRedisClient(),
     concurrency,
   });

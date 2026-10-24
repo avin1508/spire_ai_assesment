@@ -3,6 +3,7 @@ import { getDbState } from './config/db.js';
 import { getRedisState } from './config/redis.js';
 import jobsRouter from './routes/jobs.routes.js';
 import resumesRouter from './routes/resumes.routes.js';
+import recommendationsRouter from './routes/recommendations.routes.js';
 
 // MongoDB driver errors that mean "database unavailable or too slow".
 const UNAVAILABLE_ERRORS = new Set([
@@ -48,6 +49,7 @@ export function createApp() {
 
   app.use('/api/jobs', jobsRouter);
   app.use('/api/resumes', resumesRouter);
+  app.use('/api/recommendations', recommendationsRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'not_found', message: `No route for ${req.method} ${req.path}` });
@@ -85,7 +87,9 @@ export function createApp() {
         error: 'service_unavailable',
         message: req.path.startsWith('/api/resumes')
           ? 'Resume processing is temporarily unavailable. Please try again.'
-          : 'Jobs are temporarily unavailable. Please try again.',
+          : req.path.startsWith('/api/recommendations')
+            ? 'Recommendations are temporarily unavailable. Please try again.'
+            : 'Jobs are temporarily unavailable. Please try again.',
       });
       return;
     }

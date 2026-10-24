@@ -1,29 +1,26 @@
-// Combines a newly extracted (re-uploaded) resume with the existing profile:
-//  - basics: extracted values win where present, otherwise existing values stay
-//  - skills / preferred locations: union of both (case-insensitive)
+// Combines a newly extracted (uploaded) resume with the existing profile.
+// A new resume replaces what came from the previous resume — it may belong
+// to a different person — so nothing from the old resume leaks into the new
+// profile (and its recommendations):
+//  - skills, current role / company / location and experience duration come
+//    from the new resume (empty if it doesn't state them; the user fills them in)
+//  - name, email and phone: the new resume's values where present, otherwise
+//    the existing ones (the user reviews them on the form)
+//  - preferred locations are a preference: kept unless the resume states some
 //  - experiences / education: the new resume's entries replace the previous
 //    resume's entries, while entries the user added or edited by hand
 //    (source: 'manual') are kept.
 // (No imports: this file is also loaded by the Node test runner.)
 
-const BASIC_FIELDS = [
-  'fullName',
-  'email',
-  'countryCode',
-  'phone',
-  'currentRole',
-  'currentLocation',
-  'experienceYears',
-  'experienceMonths',
-  'currentCompany',
-];
+const FROM_RESUME = ['currentRole', 'currentCompany', 'currentLocation', 'experienceYears', 'experienceMonths'];
+const CONTACT = ['fullName', 'email', 'countryCode', 'phone'];
 
 const hasValue = (value) => value != null && String(value).trim() !== '';
 
-function unionStrings(...lists) {
+function uniqueStrings(list) {
   const seen = new Set();
   const result = [];
-  lists.flat().forEach((item) => {
+  (list ?? []).forEach((item) => {
     if (typeof item !== 'string' || !item.trim()) return;
     const key = item.trim().toLowerCase();
     if (seen.has(key)) return;
@@ -51,22 +48,23 @@ export function mergeExtractedProfile(existing, extracted) {
   if (!existing) {
     return {
       ...extracted,
-      preferredLocations: unionStrings(extracted.preferredLocations ?? []),
-      skills: unionStrings(extracted.skills ?? []),
+      preferredLocations: uniqueStrings(extracted.preferredLocations),
+      skills: uniqueStrings(extracted.skills),
       experiences: fromResume(extracted.experiences),
       education: fromResume(extracted.education),
     };
   }
 
   const merged = { ...existing };
-  BASIC_FIELDS.forEach((field) => {
+  FROM_RESUME.forEach((field) => {
+    merged[field] = hasValue(extracted[field]) ? extracted[field] : '';
+  });
+  CONTACT.forEach((field) => {
     if (hasValue(extracted[field])) merged[field] = extracted[field];
   });
-  merged.preferredLocations = unionStrings(
-    existing.preferredLocations ?? [],
-    extracted.preferredLocations ?? []
-  );
-  merged.skills = unionStrings(existing.skills ?? [], extracted.skills ?? []);
+  merged.skills = uniqueStrings(extracted.skills);
+  const preferred = uniqueStrings(extracted.preferredLocations);
+  merged.preferredLocations = preferred.length ? preferred : uniqueStrings(existing.preferredLocations);
   merged.experiences = mergeEntries(existing.experiences, extracted.experiences);
   merged.education = mergeEntries(existing.education, extracted.education);
   return merged;

@@ -91,6 +91,21 @@ The core assessment requirements come first. Other features must not break them.
   - **App:** real processing screen, confirm-before-replace, guest session id, resume download.
   - **Tests:** backend 90, frontend 33.
 
+- [x] **Job recommendations, guest flow** (Prompt #41):
+  - Minimal matching profile stored on the server (no personal data); BullMQ `recommendations` queue + worker.
+  - Candidate selection from the 500 real jobs, then Gemini ranking (validated: only real candidate ids).
+  - Shared Gemini quota guard in Redis (optional RPM/TPM/daily limits, circuit breaker, 429 → deferred, daily quota → after midnight Pacific).
+  - Regeneration on matching-profile changes; recovery after app restart.
+  - Tests: backend 119, frontend 27.
+- [x] **Fix: wrong recommendations after uploading a different person's resume** (Prompt #42):
+  - New resume replaces resume-derived skills, role and experience; manual entries kept.
+  - Skill spellings normalised ("React.js" = "React", "Node.js" = "Node"), so known skills are no longer gaps.
+  - Generic title words ("developer", "engineer") no longer match unrelated roles; rules version in the hash forces fresh results.
+  - Tests: backend 121, frontend 30. Live: MERN → Java → Data → MERN resumes in one guest session, all checks pass.
+- [x] **Emulator end-to-end verification** (Prompt #43):
+  - Passed: Java → MERN resume replacement in the app UI, recommendations, React matching, restart, loading and error/recovery states.
+  - Deferred and empty states not verified in the UI (tests only).
+
 ### In progress
 - [ ] Review of the All Jobs API integration (Prompt #29)
 - [ ] Review of the Docker + Redis setup (Prompts #26–#27)

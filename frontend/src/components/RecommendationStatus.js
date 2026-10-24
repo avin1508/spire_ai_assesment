@@ -16,13 +16,17 @@ const COPY = {
   unavailable: {
     title: "Recommendations aren't ready yet",
   },
+  deferred: {
+    title: 'Your recommendations are on the way',
+  },
   error: {
     title: 'Something went wrong',
   },
 };
 
-// Non-list states of the Recommended tab: loading, no matches, or matching
-// unavailable / failed (with the service's own message and a retry).
+// Non-list states of the Recommended tab: loading, no matches, waiting for
+// AI capacity (deferred), or unavailable / failed (with the service's own
+// message and a retry).
 export default function RecommendationStatus({ status, message, onRetry }) {
   const copy = COPY[status];
 

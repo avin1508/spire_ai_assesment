@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "153748385626",
+    "project_id": "mypushapp-9ea07",
+    "storage_bucket": "mypushapp-9ea07.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:153748385626:android:4f9ed5027d3e22190e0d63",
+        "android_client_info": {
+          "package_name": "com.spireai.iexchange"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBCGxT1CJkyKKmvs6-7hhzY_C9VRX3AHbE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

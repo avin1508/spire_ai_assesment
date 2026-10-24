@@ -205,6 +205,9 @@ Google sign-in doesn't work in Expo Go. It needs a development build or APK (`np
 | POST | `/api/resumes/jobs/:jobId/retry` | Re-queue a failed, retryable job (409 if not retryable) |
 | POST | `/api/resumes/:resumeId/confirm` | Make it the guest's resume after the profile is saved; the previous resume is deleted |
 | GET | `/api/resumes/:resumeId/download` | The guest's confirmed resume file (owner only, `Cache-Control: private, no-store`) |
+| POST | `/api/recommendations` | `{ matchingProfile }` (skills, role, job titles, experience, locations, degree/field only; anything else is dropped) → `202` new run or `200` existing `{ recommendationId, profileVersion, status, pollAfterMs, … }` |
+| GET | `/api/recommendations/current` | Current status: `queued / processing / deferred / completed / failed` (or `{ status: "none" }`); `items` (real jobs + `fitLabel`, `matchedSkills`, `gapSkills`, `reason`) only when completed |
+| POST | `/api/recommendations/:id/retry` | Re-schedule a failed, retryable run |
 | GET | `/api/jobs/:jobId` | The full job, including the description; 400 for a malformed id, 404 if it doesn't exist |
 
 **Shared filters** (the same meaning on every endpoint):
@@ -235,6 +238,8 @@ The backend API tests run against an in-memory MongoDB (`mongodb-memory-server`,
 
 ```bash
 ```
+
+Uploading a new resume replaces the skills, role and experience taken from the previous resume (it may be a different person's); entries added by hand are kept. Skill spellings are normalised when matching ("React.js" = "React").
 
 Guest data (profile, skills, experience, education, resume details) is saved on the device in AsyncStorage under a guest-only namespace (`spire:guest:*`). The resume file is copied into the app's private document folder, so both survive restarts.
 

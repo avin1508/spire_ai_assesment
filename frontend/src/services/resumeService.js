@@ -1,6 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
-import { API_BASE_URL, API_TIMEOUT_MS } from '../config/api';
+import { API_BASE_URL } from '../config/api';
 import { ApiError } from './errors';
+import { guestRequest as request } from './guestApi';
 import { getGuestSessionId } from '../storage/guestSession';
 
 // Client for the backend resume API (backend/src/routes/resumes.routes.js).
@@ -8,49 +9,6 @@ import { getGuestSessionId } from '../storage/guestSession';
 // returns this guest's own uploads.
 
 const UPLOAD_TIMEOUT_MS = 60000;
-
-async function request(path, { method = 'GET', body, headers = {}, signal, timeoutMs = API_TIMEOUT_MS } = {}) {
-  const controller = new AbortController();
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, timeoutMs);
-  const onAbort = () => controller.abort();
-  if (signal?.aborted) controller.abort();
-  signal?.addEventListener?.('abort', onAbort);
-
-  let response;
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
-      method,
-      body,
-      signal: controller.signal,
-      headers: { Accept: 'application/json', 'X-Guest-Session': await getGuestSessionId(), ...headers },
-    });
-  } catch (error) {
-    if (timedOut) throw new ApiError('The server took too long to respond.', { status: 0, code: 'timeout' });
-    if (error?.name === 'AbortError') throw error;
-    throw new ApiError("Couldn't reach the server. Check your connection.", { status: 0, code: 'network' });
-  } finally {
-    clearTimeout(timer);
-    signal?.removeEventListener?.('abort', onAbort);
-  }
-
-  let data = null;
-  try {
-    data = await response.json();
-  } catch {
-    // Non-JSON body: handled below.
-  }
-  if (!response.ok) {
-    throw new ApiError(data?.message || `Request failed (${response.status})`, {
-      status: response.status,
-      code: data?.error ?? null,
-    });
-  }
-  return data;
-}
 
 /**
  * Uploads a PDF/DOCX resume for processing.

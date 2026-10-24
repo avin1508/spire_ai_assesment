@@ -2439,3 +2439,94 @@ one correction need to if the user will not login na so he can not apply ok add 
   - Download → share sheet with the file;
   - server: the record is confirmed.
 - **Tests:** backend 91/91, frontend 33/33.
+
+## Prompt #41: Guest job recommendations (end to end)
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Exact prompt:** "Implement the complete guest-only job recommendation flow …" (minimal matching profile; BullMQ/Redis; candidates from MongoDB, Gemini ranks only real jobs; persisted status/results; Recommended screen on the real API; deferred on quota; regeneration; retry; recovery; no login/FCM/dev build now).
+
+### Built
+- **Backend:**
+  - `middleware/owner.js`: `requireOwner` / `requireDatabase` moved out of the resume routes and shared.
+  - `services/matchingProfile.js`: whitelist + version hash.
+  - `models/recommendation.model.js`: lifecycle `queued → processing → completed`, plus `deferred`, `failed`, `superseded`; unique `{ownerKey, profileVersion}`.
+  - `services/jobMatching.js`: skills / title / location / experience scoring, top 30, calculated matched and gap skills.
+  - `services/geminiQuota.js`: shared Redis guard, optional `GEMINI_RPM/TPM/DAILY_BUDGET` (nothing assumed), circuit breaker, retry hints, daily quota → next midnight Pacific.
+  - `services/gemini.js`: `createJobRanker` (JSON schema; the original error is kept for the guard).
+  - `queue/recommendationQueue.js` (job id `rec-<id>-<run>`, jittered backoff); `services/recommendations.service.js` (ensure / current / retry / maintenance + 30-day retention); `workers/recommendationWorker.js`; `routes/recommendations.routes.js`.
+  - `worker.js` runs both workers, the shared guard and a 30-second maintenance sweep. The resume worker uses the guard too.
+- **Frontend:**
+  - `utils/recommendations.js` (matching profile, state mapping, view, polling); `services/guestApi.js` (shared guest request) + `recommendationService.js` (real API).
+  - `store/profileSlice.js` (sync / refresh / retry thunks, guarded against stale responses); `store/recommendationSync.js` (listener: regenerate on matching changes, recover at start-up); `hooks/useRecommendationPolling.js`.
+  - `RecommendedScreen` and `RecommendationStatus` (deferred state).
+
+### Verified
+- **Tests:** backend 119/119 (+28), frontend 27/27 (+7), Android export built, `expo-doctor` 20/20.
+- **Live** (Docker stack, real `gemini-3.5-flash-lite`):
+  - POST 202, repeat 200 (same record) → selecting_jobs → ranking → completed in about 13 s; 10 ranked real jobs; other guest `none`;
+  - stored record has only the 8 matching fields (no name or email). The test record was deleted afterwards.
+- **Emulator, cold start:** the Recommended tab recovered **15** ranked jobs from the server (fit labels, Match/Gaps); Job Details shows Excellent Fit, Exact Match (6) and the full API description.
+
+### Not verified live
+- A real 429 or daily-quota response from Gemini (covered by tests with faked errors).
+- Regeneration triggered from the Profile edit screens on the device (covered by unit and API tests).
+- Physical phone.
+
+### Mistakes and fixes
+- Two candidate-selection test assertions were too strict: React Native and MERN jobs legitimately share JavaScript, Redux and TypeScript. The assertions were corrected; the scoring is unchanged.
+
+## Prompt #42: Recommendations wrong after uploading different people's resumes
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Exact prompt:** "no recomendation is now working properly check with the multiple resumes first upload different person resume the see therecomedation then differnt person did you get then anlyse what hapneing my prefiel belongs to mernstack its giving me recomndation for java also and in my skills i have the rect but its showing gap test this things properly did you get"
+
+### Root causes (found in the stored data)
+1. `frontend/src/utils/profileMerge.js` **unioned** skills and experiences across resumes, so a MERN profile still had the previous Java person's skills and titles. The matcher correctly picked Java jobs for them.
+2. Skills were compared as exact strings: "React.js" on a resume did not equal "React" in a job, so React showed as a gap.
+3. Generic title words ("developer", "engineer", "software") matched every job, and results computed under the old rules were reused from the cache.
+
+### Fixes
+- `profileMerge.js` rewritten: a new resume replaces skills, role, company, location and experience duration, plus the resume's experience and education entries. Entries added by hand are kept; contact details fall back to the existing ones only when the resume has none.
+- `jobMatching.js`: `skillKey` normalisation (punctuation, `.js` suffix, aliases such as Redux Toolkit → Redux, REST API Design → REST APIs) and title stop words.
+- `matchingProfile.js`: `MATCHING_RULES_VERSION = 2` is part of the profile version, so old cached results are regenerated.
+
+### Verified
+- **Tests:** backend 121/121, frontend 30/30. New tests: different-person merge, resume spellings vs job spellings, MERN profile → no Java roles.
+- **Live** (Docker stack, real Gemini), one guest session uploading MERN → Java → Data analyst → MERN resumes, using the app's own merge code:
+  - MERN → MERN/Node/React roles, React never a gap, no Java/Spring;
+  - Java → Java/Spring roles;
+  - Data → Data Analyst roles, no carried-over skills;
+  - the second MERN run matched the first.
+- The test guest's resume, GridFS file and 3 recommendations were deleted afterwards.
+
+### Mistakes and fixes
+- My Prompt #12 merge design (union of skills) assumed the same person re-uploads. It broke as soon as a different person's resume was uploaded. It now replaces the resume-derived data instead.
+- A profile already saved on the device keeps the old merged skills until the resume is re-uploaded or the skills are edited.
+
+## Prompt #43: Final end-to-end verification on the Android emulator
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Exact prompt:** "Now perform the final end-to-end verification on the Android emulator using the actual app UI and the running backend. …" (resume upload → confirmation → recommendations → Recommended screen; use the existing MERN resume; React matching, no Java for MERN, no old skills after replacement; restart, loading/deferred/empty/error states; logs; tests; no code changes unless a reproducible bug; report PASS / FAIL / NOT VERIFIED).
+
+### What was done
+- The user's MERN resume was copied from GridFS to the emulator. A fictional Java resume (Ravi Kumar) was generated for the replacement test.
+- In the app UI: Profile → Replace resume → Java resume → confirm, then Recommended. Next: Replace resume → MERN resume → confirm, then Recommended. Then Job Details, a force-stop and relaunch, and the backend stopped and started again.
+
+### Results
+- **PASS:**
+  - Java replacing the earlier Asha test profile removed all of its skills (React, Node.js, MongoDB…); Java resume → Java/Spring jobs.
+  - MERN replacing Java: no Java skills left. Results: 15 MERN/MEAN roles, React never a gap, 0 Java/Spring roles; Job Details shows Exact Match (6) incl. React.
+  - Loading state ("Agent Sigma is on the hunt") shown; results stay the same after the app restart, and no duplicate record was created.
+  - Backend down → "Something went wrong" + Try again → recovered after the backend restarted.
+  - Stored record holds only the 8 matching fields.
+  - Logs: no app or backend errors during the test.
+  - Tests: backend 121/121, frontend 30/30.
+- **NOT VERIFIED in the UI:** the deferred state (no real Gemini quota error available) and the empty state (would need fake profile data). Both are covered by automated tests only.
+- No bug found, so no code was changed.
+
+### Notes
+- Recommendations are not cached on the device. With the backend down, the tab shows the error state instead of the earlier results.
+- The emulator's guest profile now holds the user's MERN resume data.

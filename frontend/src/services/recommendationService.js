@@ -1,23 +1,21 @@
-import { ServiceUnavailableError } from './errors';
+import { guestRequest } from './guestApi';
+
+// Client for the backend recommendations API
+// (backend/src/routes/recommendations.routes.js). Scoped to this guest.
 
 /**
- * Resolves with recommended jobs for a confirmed profile. Each job:
- * {
- *   id: string,
- *   title: string,
- *   company: string,
- *   location: string,
- *   postedAt: string (ISO date),
- *   verified?: boolean,
- *   fitLabel?: string,          // e.g. "Good Fit"
- *   matchedSkills?: string[],
- *   gapSkills?: string[],       // skills the job needs that the profile lacks
- * }
- *
- * Not built yet (a later phase): always rejects with ServiceUnavailableError,
- * so the Recommended tab says recommendations aren't ready instead of
- * showing sample jobs.
+ * Makes sure recommendations exist for this matching profile (see
+ * utils/recommendations.js buildMatchingProfile). Same profile again → the
+ * existing recommendation; a changed profile → a new one.
+ * → { recommendationId, profileVersion, status, nextAttemptAt, error, pollAfterMs, items }
  */
-export async function fetchRecommendations(profile) {
-  throw new ServiceUnavailableError('Job recommendations are coming soon. Your profile has been saved.');
-}
+export const ensureRecommendations = (matchingProfile) =>
+  guestRequest('/api/recommendations', { method: 'POST', json: { matchingProfile } });
+
+/** Current recommendation status (+ items when completed), or { status: 'none' }. */
+export const fetchCurrentRecommendations = ({ signal } = {}) =>
+  guestRequest('/api/recommendations/current', { signal });
+
+/** Re-schedules a failed, retryable recommendation. */
+export const retryRecommendations = (recommendationId) =>
+  guestRequest(`/api/recommendations/${encodeURIComponent(recommendationId)}/retry`, { method: 'POST' });

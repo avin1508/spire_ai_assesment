@@ -1,6 +1,4 @@
-import { createHash } from 'node:crypto';
 import { Router } from 'express';
-import mongoose from 'mongoose';
 import multer from 'multer';
 import {
   confirmResume,
@@ -10,7 +8,8 @@ import {
   retryResumeJob,
 } from '../services/resumes.service.js';
 import { MAX_RESUME_BYTES } from '../services/resumeFile.js';
-import { HttpError, ServiceUnavailableError } from '../utils/httpErrors.js';
+import { HttpError } from '../utils/httpErrors.js';
+import { requireDatabase, requireOwner } from '../middleware/owner.js';
 
 // Resume upload and processing API.
 //
@@ -20,39 +19,10 @@ import { HttpError, ServiceUnavailableError } from '../utils/httpErrors.js';
 //   POST /api/resumes/:resumeId/confirm  make it the owner's resume (after profile confirm)
 //   GET  /api/resumes/:resumeId/download the owner's confirmed resume file
 //
-// Identity: guests send X-Guest-Session (a random UUID the app generates and
-// keeps). Only its SHA-256 hash is stored. Signed-in users aren't supported
-// yet (the app has no verified login), so an Authorization header alone is
-// rejected rather than trusted.
+// Identity: guests send X-Guest-Session; see middleware/owner.js.
 const router = Router();
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{8,100}$/;
-
-export const guestOwnerKey = (guestSessionId) =>
-  createHash('sha256').update(`guest:${guestSessionId.toLowerCase()}`).digest('hex');
-
-function requireOwner(req, res, next) {
-  const guestSession = req.get('x-guest-session');
-  if (guestSession && UUID.test(guestSession)) {
-    req.owner = { type: 'guest', key: guestOwnerKey(guestSession) };
-    next();
-    return;
-  }
-  if (!guestSession && req.get('authorization')) {
-    next(new HttpError(401, 'auth_not_supported', 'Signed-in access to resumes is not available yet.'));
-    return;
-  }
-  next(new HttpError(401, 'guest_session_required', 'A valid X-Guest-Session header is required.'));
-}
-
-function requireDatabase(req, res, next) {
-  if (mongoose.connection.readyState !== 1) {
-    next(new ServiceUnavailableError('The database is not connected'));
-    return;
-  }
-  next();
-}
 
 const upload = multer({
   storage: multer.memoryStorage(),
