@@ -57,7 +57,9 @@ export default function JobsNavigator() {
         <JobsTab.Screen
           name="AllJobs"
           component={OpportunitiesScreen}
-          options={{ title: 'All Jobs' }}
+          // Horizontal drags pan the map here, so tab swiping is off on this tab
+          // (tapping the tab labels still switches tabs).
+          options={{ title: 'All Jobs', swipeEnabled: false }}
         />
         <JobsTab.Screen
           name="Saved"

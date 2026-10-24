@@ -92,7 +92,15 @@ function matchesFilters(job, filters) {
 function matchesQuery(job, query) {
   const text = query.trim().toLowerCase();
   if (!text) return true;
-  return [job.title, job.company, job.location, ...(job.matchedSkills ?? []), ...(job.gapSkills ?? [])]
+  return [
+    job.title,
+    job.company,
+    job.area,
+    job.location,
+    ...(job.matchedSkills ?? []),
+    ...(job.gapSkills ?? []),
+    ...(job.requiredSkills ?? []),
+  ]
     .filter(Boolean)
     .some((field) => field.toLowerCase().includes(text));
 }
