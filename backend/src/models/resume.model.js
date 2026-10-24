@@ -9,7 +9,8 @@ import mongoose from 'mongoose';
 //   processing: queued → processing → completed | failed
 //   confirmation: pending (confirmedAt null, expiresAt set) → confirmed
 //     (confirmedAt set, expiresAt null). Only the newest confirmed resume of
-//     an owner is kept; pending ones are deleted by the cleanup after expiry.
+//     an owner is kept (archived ones excepted, see archivedAt); pending ones
+//     are deleted by the cleanup after expiry.
 
 export const OWNER_TYPES = ['guest', 'user'];
 export const RESUME_KINDS = ['pdf', 'docx'];
@@ -117,6 +118,13 @@ const resumeSchema = new mongoose.Schema(
     },
     expiresAt: {
       // Pending uploads are deleted after this time; null once confirmed.
+      type: Date,
+      default: null,
+    },
+    archivedAt: {
+      // A guest's confirmed resume moved to an account that keeps its own
+      // resume (services/guestLink.service.js): retained, but never the
+      // account's current resume and never removed as "superseded".
       type: Date,
       default: null,
     },

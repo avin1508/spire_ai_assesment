@@ -8,12 +8,14 @@ export class ServiceUnavailableError extends Error {
 }
 
 // A backend request that failed: `status` is the HTTP status (0 when the
-// server couldn't be reached) and `code` the API error code, if any.
+// server couldn't be reached), `code` the API error code and `details` the
+// per-field problems of a 400, if any.
 export class ApiError extends Error {
-  constructor(message, { status = 0, code = null } = {}) {
+  constructor(message, { status = 0, code = null, details = null } = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }

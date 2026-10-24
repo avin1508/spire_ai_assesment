@@ -1,11 +1,9 @@
-import { useState } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
-import GoogleSignInButton from './GoogleSignInButton';
-import { authSheetClosed, selectAuthSheet, signedIn } from '../store/sessionSlice';
-import { signInWithGoogleToken } from '../services/authService';
+import Button from './Button';
+import { authSheetClosed, selectAuthSheet } from '../store/sessionSlice';
 import { navigationRef } from '../navigation/navigationRef';
 import { colors, radius, spacing } from '../theme';
 
@@ -19,35 +17,21 @@ const BENEFITS = [
 ];
 
 // The one guest login sheet for the whole app. Mounted once in App.js and
-// opened through Redux (useRequireAuth → authSheetOpened).
+// opened through Redux (useRequireAuth → authSheetOpened). Its buttons open
+// the Register / Login screens, which carry the sheet's intent.
 export default function GuestLoginSheet() {
   const dispatch = useDispatch();
   const { visible, intent } = useSelector(selectAuthSheet);
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
 
   const illustrationWidth = Math.min(width * 0.42, 200);
 
-  const close = () => {
-    if (busy) return;
-    setError(null);
-    dispatch(authSheetClosed());
-  };
+  const close = () => dispatch(authSheetClosed());
 
-  const handleIdToken = async (idToken) => {
-    setError(null);
-    setBusy(true);
-    try {
-      const { user } = await signInWithGoogleToken(idToken);
-      dispatch(signedIn(user));
-      if (intent && navigationRef.isReady()) navigationRef.navigate(intent.name, intent.params);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
+  const open = (screen) => {
+    dispatch(authSheetClosed());
+    if (navigationRef.isReady()) navigationRef.navigate(screen, { intent });
   };
 
   return (
@@ -108,21 +92,8 @@ export default function GuestLoginSheet() {
             />
           </View>
 
-          {error ? (
-            <View style={styles.error}>
-              <Ionicons name="alert-circle-outline" size={18} color={colors.danger} />
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : null}
-
-          <GoogleSignInButton
-            busy={busy}
-            onIdToken={handleIdToken}
-            onError={(message) => {
-              setBusy(false);
-              setError(message);
-            }}
-          />
+          <Button label="Create account" onPress={() => open('Register')} />
+          <Button label="Log in" variant="outline" onPress={() => open('Login')} style={styles.secondary} />
         </View>
       </View>
     </Modal>
@@ -241,18 +212,7 @@ const styles = StyleSheet.create({
     right: -spacing.xl,
     bottom: -spacing.lg,
   },
-  error: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: '#FDECEC',
-  },
-  errorText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.danger,
+  secondary: {
+    marginTop: spacing.md,
   },
 });

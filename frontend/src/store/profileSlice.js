@@ -5,8 +5,21 @@ import {
   retryRecommendations as retryRecommendationsRequest,
 } from '../services/recommendationService';
 import { recommendationStateFrom } from '../utils/recommendations';
+import {
+  afterConflict,
+  afterEdit,
+  afterSaveFailed,
+  afterSaveStarted,
+  afterSaveSucceeded,
+  initialSync,
+  syncFromStorage,
+} from '../utils/profileSync';
 
-// Resume, confirmed profile and recommendation results for the current session.
+// Resume, confirmed profile and recommendation results of the current owner:
+// `owner` is 'guest' or 'user:<id>' (utils/sessionRestore.js ownerFor). All
+// of it is replaced together when the owner changes (ownerDataLoaded /
+// sessionCleared), so one account's data never shows under another.
+// sync: whether the profile is saved on the server (utils/profileSync.js).
 // recommendations.status: 'idle' (nothing requested yet) | 'none' | 'queued' |
 //   'processing' | 'deferred' (quota; waiting) | 'ready' | 'failed' | 'error'
 //   (request failed). Results come only from the server (see utils/recommendations.js).
@@ -17,11 +30,12 @@ import { recommendationStateFrom } from '../utils/recommendations';
 const failure = (error) => ({ message: error?.message ?? 'Something went wrong.' });
 
 // Sends the matching profile (sent after a profile change or at start-up).
+// `auth` is the owner's identity captured when the profile changed.
 export const syncRecommendations = createAsyncThunk(
   'profile/syncRecommendations',
-  async (matchingProfile, { rejectWithValue }) => {
+  async ({ matchingProfile, auth }, { rejectWithValue }) => {
     try {
-      return await ensureRecommendations(matchingProfile);
+      return await ensureRecommendations(matchingProfile, auth);
     } catch (error) {
       return rejectWithValue(failure(error));
     }
@@ -66,14 +80,20 @@ const initialRecommendations = {
   requestId: null,
 };
 
+const emptyOwnerData = {
+  owner: 'guest',
+  resume: null,
+  // True when the saved resume metadata points at a file that no longer exists.
+  resumeFileMissing: false,
+  profile: null,
+  recommendations: initialRecommendations,
+  sync: initialSync,
+};
+
 const profileSlice = createSlice({
   name: 'profile',
   initialState: {
-    resume: null,
-    // True when the saved resume metadata points at a file that no longer exists.
-    resumeFileMissing: false,
-    profile: null,
-    recommendations: initialRecommendations,
+    ...emptyOwnerData,
     storageStatus: 'loading',
   },
   reducers: {
@@ -83,20 +103,34 @@ const profileSlice = createSlice({
       state.profile = action.payload.profile;
       state.resume = action.payload.resume;
       state.resumeFileMissing = false;
+      state.sync = afterEdit(state.sync);
     },
     // The server no longer has the confirmed resume file.
     resumeFileMissingDetected(state) {
       state.resumeFileMissing = true;
     },
-    guestDataRestored(state, action) {
-      const { profile, resume, resumeFileMissing, storageStatus } = action.payload;
+    // The data of one owner (the guest at start-up, or an account after
+    // sign-in / restart) replaces whatever was shown. Recommendations of a
+    // previous owner are dropped.
+    ownerDataLoaded(state, action) {
+      const { owner, profile, resume, resumeFileMissing = false, storageStatus = 'ready', sync } = action.payload;
+      if (owner !== state.owner) state.recommendations = initialRecommendations;
+      state.owner = owner;
       state.profile = profile;
       state.resume = resume;
       state.resumeFileMissing = resumeFileMissing;
       state.storageStatus = storageStatus;
+      // A profile the server has never confirmed (e.g. saved before server
+      // sync existed) still has to be saved there.
+      state.sync = syncFromStorage(profile && !sync?.revision ? { ...sync, dirty: true } : sync);
+    },
+    // Logout: back to an empty guest.
+    sessionCleared(state) {
+      Object.assign(state, emptyOwnerData, { storageStatus: state.storageStatus === 'readonly' ? 'ready' : state.storageStatus });
     },
     profileSaved(state, action) {
       state.profile = action.payload;
+      state.sync = afterEdit(state.sync);
     },
     // Add or update one entry (matched by id) in profile.experiences / profile.education.
     profileEntrySaved(state, action) {
@@ -106,10 +140,34 @@ const profileSlice = createSlice({
       if (index === -1) entries.unshift(entry);
       else entries[index] = entry;
       state.profile[list] = entries;
+      state.sync = afterEdit(state.sync);
     },
     profileEntryRemoved(state, action) {
       const { list, id } = action.payload;
       state.profile[list] = (state.profile[list] ?? []).filter((item) => item.id !== id);
+      state.sync = afterEdit(state.sync);
+    },
+    // Server sync of the profile (store/profileServerSync.js); `owner` guards
+    // against a result arriving after the owner changed.
+    profileSyncStarted(state, action) {
+      if (action.payload.owner === state.owner) state.sync = afterSaveStarted(state.sync);
+    },
+    profileSyncSucceeded(state, action) {
+      const { owner, seq, revision, resume } = action.payload;
+      if (owner !== state.owner) return;
+      state.sync = afterSaveSucceeded(state.sync, { seq, revision });
+      if (resume !== undefined && resume?.resumeId && !state.resume) state.resume = resume;
+    },
+    profileSyncFailed(state, action) {
+      if (action.payload.owner === state.owner) state.sync = afterSaveFailed(state.sync, action.payload.message);
+    },
+    // The server has a newer profile: show it instead of the local copy.
+    profileSyncConflict(state, action) {
+      const { owner, profile, resume, revision } = action.payload;
+      if (owner !== state.owner) return;
+      state.profile = profile;
+      state.resume = resume;
+      state.sync = afterConflict(state.sync, revision);
     },
   },
   extraReducers: (builder) => {
@@ -170,10 +228,15 @@ const profileSlice = createSlice({
 export const {
   profileConfirmed,
   resumeFileMissingDetected,
-  guestDataRestored,
+  ownerDataLoaded,
+  sessionCleared,
   profileSaved,
   profileEntrySaved,
   profileEntryRemoved,
+  profileSyncStarted,
+  profileSyncSucceeded,
+  profileSyncFailed,
+  profileSyncConflict,
 } = profileSlice.actions;
 
 // Saves the profile. Recommendations are refreshed by store/recommendationSync.js
@@ -185,5 +248,7 @@ export const selectProfile = (state) => state.profile.profile;
 export const selectRecommendations = (state) => state.profile.recommendations;
 export const selectResumeFileMissing = (state) => state.profile.resumeFileMissing;
 export const selectStorageStatus = (state) => state.profile.storageStatus;
+export const selectProfileSync = (state) => state.profile.sync;
+export const selectOwner = (state) => state.profile.owner;
 
 export default profileSlice.reducer;

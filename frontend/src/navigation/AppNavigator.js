@@ -4,11 +4,12 @@ import ResumeConfirmScreen from '../screens/ResumeConfirmScreen';
 import ProfileProcessingScreen from '../screens/ProfileProcessingScreen';
 import ProfileConfirmScreen from '../screens/ProfileConfirmScreen';
 import JobDetailsScreen from '../screens/JobDetailsScreen';
+import { LoginScreen, RegisterScreen } from '../screens/AuthScreen';
 
 const Stack = createNativeStackNavigator();
 
 // Top-level stack: the tabbed app plus full-screen flows (no tab bar)
-// such as the resume → profile flow.
+// such as the resume → profile flow and Login / Register.
 export default function AppNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -21,6 +22,8 @@ export default function AppNavigator() {
       />
       <Stack.Screen name="ProfileConfirm" component={ProfileConfirmScreen} />
       <Stack.Screen name="JobDetails" component={JobDetailsScreen} />
+      <Stack.Screen name="Login" component={LoginScreen} options={{ animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="Register" component={RegisterScreen} options={{ animation: 'slide_from_bottom' }} />
     </Stack.Navigator>
   );
 }

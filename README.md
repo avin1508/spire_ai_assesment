@@ -208,6 +208,15 @@ Google sign-in doesn't work in Expo Go. It needs a development build or APK (`np
 | POST | `/api/recommendations` | `{ matchingProfile }` (skills, role, job titles, experience, locations, degree/field only; anything else is dropped) → `202` new run or `200` existing `{ recommendationId, profileVersion, status, pollAfterMs, … }` |
 | GET | `/api/recommendations/current` | Current status: `queued / processing / deferred / completed / failed` (or `{ status: "none" }`); `items` (real jobs + `fitLabel`, `matchedSkills`, `gapSkills`, `reason`) only when completed |
 | POST | `/api/recommendations/:id/retry` | Re-schedule a failed, retryable run |
+| POST | `/api/auth/register` | `{ name, email, password }` → `201 { user, token, expiresAt }`; 409 `email_taken` |
+| POST | `/api/auth/login` | `{ email, password }` → `{ user, token, expiresAt }`; 401 `invalid_credentials` (same for unknown email); rate limited (429) |
+| POST | `/api/auth/logout` | Bearer → `204`, the session is revoked |
+| GET | `/api/auth/me` | Bearer → `{ user }` |
+| POST | `/api/auth/link-guest` | Bearer + `X-Guest-Session` → links that guest's profile / resume / recommendations to the account (idempotent; one account per guest session) |
+| PUT / DELETE | `/api/devices` | `{ token, platform: "android" }`: register this device's FCM token for the owner (moves it from any previous owner) / remove it (owner only). The worker sends "Your job recommendations are ready!" once per completed run with results, when `FIREBASE_SERVICE_ACCOUNT_FILE` is configured |
+| GET / PUT | `/api/profile` | The owner's complete profile; PUT `{ profile, baseRevision }`, 409 `profile_conflict` if the server copy is newer |
+
+Resume and recommendation endpoints accept either `Authorization: Bearer <token>` (signed-in user) or `X-Guest-Session` (guest). An invalid token is rejected with 401, never treated as a guest.
 | GET | `/api/jobs/:jobId` | The full job, including the description; 400 for a malformed id, 404 if it doesn't exist |
 
 **Shared filters** (the same meaning on every endpoint):

@@ -179,9 +179,14 @@ async function deleteResume(doc) {
   await Resume.deleteOne({ _id: doc._id });
 }
 
-// Keeps only the newest confirmed resume of an owner.
+// The owner's current resume: the newest confirmed one that isn't archived.
+export function findCurrentResume(ownerKey) {
+  return Resume.findOne({ ownerKey, confirmedAt: { $ne: null }, archivedAt: null }).sort({ confirmedAt: -1, _id: -1 });
+}
+
+// Keeps only the newest confirmed resume of an owner (archived ones are kept).
 async function removeSupersededResumes(ownerKey) {
-  const confirmed = await Resume.find({ ownerKey, confirmedAt: { $ne: null } })
+  const confirmed = await Resume.find({ ownerKey, confirmedAt: { $ne: null }, archivedAt: null })
     .sort({ confirmedAt: -1, _id: -1 })
     .select({ _id: 1, fileId: 1 });
   for (const old of confirmed.slice(1)) await deleteResume(old);
@@ -214,7 +219,7 @@ export async function cleanupResumes(now = Date.now()) {
   counts.expired = expired.length;
 
   const owners = await Resume.aggregate([
-    { $match: { confirmedAt: { $ne: null } } },
+    { $match: { confirmedAt: { $ne: null }, archivedAt: null } },
     { $group: { _id: '$ownerKey', count: { $sum: 1 } } },
     { $match: { count: { $gt: 1 } } },
   ]);

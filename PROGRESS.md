@@ -209,3 +209,12 @@ The core assessment requirements come first. Other features must not break them.
 - [ ] Working demo on a device or emulator (the UI runs on an Android emulator; core features still missing)
 - [ ] Ability to explain the code
 - [ ] Ability to make a small live change during the demo
+- [x] **Email/password accounts + guest linking** (Prompt #45):
+  - User / Session / Profile / GuestLink models; register, login, logout, me, link-guest; profile API with revisions.
+  - Login / Register screens, secure session storage, logout, account-scoped data, profile server sync.
+  - Tests: backend 149, frontend 43. Emulator E2E: Scenarios A, B (both cases), C and D passed. Signed-in resume upload in the UI not verified (emulator out of memory).
+- [x] **Keyboard fix for Login, Register and Profile Confirm** + signed-in resume / recommendation E2E (Prompt #46): verified on the Android emulator. Tests: backend 149, frontend 43.
+- [x] **Push notifications for finished recommendations** (Prompt #47): device registration per owner, at-most-once FCM send after completion, tap → Recommended. Tests: backend 160, frontend 48.
+  - [ ] Real delivery: needs a Firebase service-account key (`FIREBASE_SERVICE_ACCOUNT_FILE`) and an Android development build.
+- [x] **Real push delivery verified** (Prompt #48): key file auto-detected and mounted read-only; Android development build; guest and logged-in pushes received and tapped on the emulator. Tests: backend 162, frontend 49.
+- [x] **Notification permission soft-ask** (Prompt #50): own explanation sheet after profile confirm, system dialog only on "Notify me", 7-day "Not now" cool-down; verified on the dev build.

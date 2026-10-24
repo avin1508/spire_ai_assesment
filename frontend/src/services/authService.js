@@ -1,24 +1,25 @@
-import { ServiceUnavailableError } from './errors';
+import { apiRequest } from './api';
+
+// Client for the backend auth API (backend/src/routes/auth.routes.js).
+// register / login → { user: { id, name, email }, token, expiresAt }.
+// The password is only ever sent to these endpoints, never stored.
+
+export const registerAccount = ({ name, email, password }) =>
+  apiRequest('/api/auth/register', { method: 'POST', json: { name: name.trim(), email: email.trim(), password }, auth: 'none' });
+
+export const loginAccount = ({ email, password }) =>
+  apiRequest('/api/auth/login', { method: 'POST', json: { email: email.trim(), password }, auth: 'none' });
+
+/** Revokes the session on the server. */
+export const logoutSession = (token) => apiRequest('/api/auth/logout', { method: 'POST', auth: { token } });
+
+/** → { user } for a valid session; 401 otherwise. */
+export const fetchMe = (token) => apiRequest('/api/auth/me', { auth: { token } });
 
 /**
- * Exchanges a Google ID token for an app session.
- *
- * Contract for the backend (not built yet):
- *   POST /api/auth/google  { idToken }
- *   → the server verifies the token with Google (signature, `aud` = our
- *     client IDs, `iss`, expiry), finds or creates the user, and returns
- *     { user: { id, name, email, picture }, sessionToken }.
- * The app must only treat the user as signed in after that response; the
- * name/email inside the token are never trusted on the client alone.
- *
- * Until the endpoint exists this always rejects, so no one is marked as
- * signed in just because Google returned a token.
- *
- * @param {string} idToken Google ID token from the sign-in flow.
+ * Links this guest's server data to the account (idempotent; the server
+ * decides what moves, see backend/src/services/guestLink.service.js).
+ * → { status, profile: 'linked'|'kept'|'none', resume: 'linked'|'retained'|'none', recommendations }
  */
-export async function signInWithGoogleToken(idToken) {
-  if (!idToken) throw new Error('Google did not return an ID token.');
-  throw new ServiceUnavailableError(
-    "Google sign-in worked, but we can't finish signing you in yet: the server that verifies Google accounts isn't set up."
-  );
-}
+export const linkGuest = (token, guestId) =>
+  apiRequest('/api/auth/link-guest', { method: 'POST', auth: { token, guestId } });

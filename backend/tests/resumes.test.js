@@ -313,13 +313,15 @@ describe('POST /api/resumes (upload)', () => {
     assert.equal(queued.length, 0);
   });
 
-  test('guest identity is required; an Authorization header alone is not trusted', async () => {
+  test('an identity is required; an unverified Authorization token is rejected (no guest fallback)', async () => {
     const missing = await upload(null);
     assert.deepEqual([missing.status, missing.body.error], [401, 'guest_session_required']);
     const invalid = await upload('not-a-uuid');
     assert.equal(invalid.status, 401);
-    const response = await fetch(`${base}/api/resumes/jobs/abc`, { headers: { Authorization: 'Bearer something' } });
-    assert.deepEqual([response.status, (await response.json()).error], [401, 'auth_not_supported']);
+    const response = await fetch(`${base}/api/resumes/jobs/abc`, {
+      headers: { Authorization: 'Bearer something-not-a-real-session-token', 'X-Guest-Session': guest() },
+    });
+    assert.deepEqual([response.status, (await response.json()).error], [401, 'session_invalid']);
   });
 
   test('the same Idempotency-Key returns the same job and queues it once', async () => {

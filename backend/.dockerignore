@@ -9,3 +9,5 @@ docker-compose*.yml
 .dockerignore
 .git
 .gitignore
+# Firebase service-account keys: mounted read-only at runtime, never baked into images
+*firebase-adminsdk*.json

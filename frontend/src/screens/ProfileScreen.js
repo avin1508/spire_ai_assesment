@@ -11,9 +11,13 @@ import useRequireAuth from '../hooks/useRequireAuth';
 import {
   resumeFileMissingDetected,
   selectProfile,
+  selectProfileSync,
   selectResume,
   selectResumeFileMissing,
 } from '../store/profileSlice';
+import { selectUser } from '../store/sessionSlice';
+import { logout } from '../store/auth';
+import { flushProfileSync } from '../store/profileServerSync';
 import { downloadResume } from '../services/resumeService';
 import { resumeTypeLabel } from '../utils/resumeProcessing';
 import { formatDateRange, getInitials } from '../utils/format';
@@ -30,9 +34,39 @@ export default function ProfileScreen({ navigation }) {
   const uploadResume = useResumeUpload({ returnTo: 'Profile' });
   const dispatch = useDispatch();
   const [downloading, setDownloading] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const user = useSelector(selectUser);
+  const sync = useSelector(selectProfileSync);
   // Settings need an account; guests get the login sheet. Downloading your
   // own resume works for guests too.
   const { requireAuth } = useRequireAuth();
+
+  const doLogout = async () => {
+    setLoggingOut(true);
+    try {
+      const { revoked } = await dispatch(logout());
+      if (!revoked) {
+        Alert.alert(
+          'Logged out on this phone',
+          "We couldn't reach the server to end your session there; it will expire on its own."
+        );
+      }
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
+  // Settings (signed in): who is signed in, and Log out.
+  const openSettings = () => {
+    if (loggingOut) return;
+    const unsaved = sync.dirty
+      ? "\n\nSome profile changes haven't been saved to your account yet and will be lost if you log out now."
+      : '';
+    Alert.alert('Account', `Signed in as ${user?.email ?? ''}${unsaved}`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log out', style: 'destructive', onPress: doLogout },
+    ], { cancelable: true });
+  };
 
   // Downloads the resume from the server and opens the share / "open with" sheet.
   const openResume = async () => {
@@ -56,19 +90,37 @@ export default function ProfileScreen({ navigation }) {
 
   const settingsButton = (
     <Pressable
-      onPress={() =>
-        requireAuth(
-          () => Alert.alert('Coming soon', 'Settings are not available yet.'),
-          backToProfile
-        )
-      }
+      onPress={() => requireAuth(openSettings, backToProfile)}
       accessibilityRole="button"
+      disabled={loggingOut}
       style={styles.settings}
     >
-      <Ionicons name="settings-outline" size={22} color={colors.primary} />
+      {loggingOut ? (
+        <ActivityIndicator color={colors.primary} accessibilityLabel="Logging out" />
+      ) : (
+        <Ionicons name="settings-outline" size={22} color={colors.primary} />
+      )}
       <Text style={styles.settingsText}>Settings</Text>
     </Pressable>
   );
+
+  // Signed-in only: say when the profile isn't saved to the account (yet).
+  const syncBanner =
+    user && (sync.status === 'failed' || sync.status === 'conflict') ? (
+      <View style={styles.syncBanner} accessibilityLiveRegion="polite">
+        <Ionicons
+          name={sync.status === 'failed' ? 'cloud-offline-outline' : 'information-circle-outline'}
+          size={18}
+          color={colors.text}
+        />
+        <Text style={styles.syncText}>{sync.message}</Text>
+        {sync.status === 'failed' && (
+          <Pressable onPress={() => dispatch(flushProfileSync())} accessibilityRole="button" hitSlop={8}>
+            <Text style={styles.syncRetry}>Retry</Text>
+          </Pressable>
+        )}
+      </View>
+    ) : null;
 
   if (!profile) {
     return (
@@ -95,6 +147,7 @@ export default function ProfileScreen({ navigation }) {
     <View style={styles.container}>
       <ScreenHeader title="Profile" right={settingsButton} />
       <ScrollView contentContainerStyle={styles.content}>
+        {syncBanner}
         <View style={styles.card}>
           <View style={styles.identity}>
             <View style={styles.avatar}>
@@ -248,6 +301,26 @@ function SectionCard({ title, children }) {
 }
 
 const styles = StyleSheet.create({
+  syncBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: '#FFF4E5',
+  },
+  syncText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.text,
+  },
+  syncRetry: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
   container: {
     flex: 1,
     backgroundColor: '#F7F8FA',

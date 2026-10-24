@@ -1,12 +1,11 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { API_BASE_URL } from '../config/api';
 import { ApiError } from './errors';
-import { guestRequest as request } from './guestApi';
-import { getGuestSessionId } from '../storage/guestSession';
+import { apiRequest as request, authHeaders } from './api';
 
 // Client for the backend resume API (backend/src/routes/resumes.routes.js).
-// Every request identifies the guest with X-Guest-Session; the server only
-// returns this guest's own uploads.
+// Every request identifies the owner (signed-in user or guest, see api.js);
+// the server only returns that owner's own uploads.
 
 const UPLOAD_TIMEOUT_MS = 60000;
 
@@ -39,12 +38,12 @@ export const getResumeJob = (jobId, { signal } = {}) =>
 export const retryResumeJob = (jobId, { signal } = {}) =>
   request(`/api/resumes/jobs/${encodeURIComponent(jobId)}/retry`, { method: 'POST', signal });
 
-/** Makes the processed upload this guest's resume. → { resume } */
+/** Makes the processed upload the owner's resume. → { resume } */
 export const confirmResume = (resumeId) =>
   request(`/api/resumes/${encodeURIComponent(resumeId)}/confirm`, { method: 'POST' });
 
 /**
- * Downloads the guest's confirmed resume into the app cache and resolves
+ * Downloads the owner's confirmed resume into the app cache and resolves
  * with the local file. Throws ApiError (404 → the server no longer has it).
  */
 export async function downloadResume(resume) {
@@ -56,7 +55,7 @@ export async function downloadResume(resume) {
     return await File.downloadFileAsync(
       `${API_BASE_URL}/api/resumes/${encodeURIComponent(resume.resumeId)}/download`,
       target,
-      { headers: { 'X-Guest-Session': await getGuestSessionId() } }
+      { headers: await authHeaders() }
     );
   } catch (error) {
     const message = String(error?.message ?? '');
