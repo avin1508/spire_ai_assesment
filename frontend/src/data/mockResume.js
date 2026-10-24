@@ -13,6 +13,7 @@ export const mockExtractedProfile = {
   experienceYears: '2',
   experienceMonths: '7',
   currentCompany: 'Northwind Tech',
+  skills: ['React', 'Node.js', 'JavaScript', 'MongoDB', 'REST APIs'],
   experiences: [
     { id: 'exp-1', title: 'Full Stack Developer', company: 'Northwind Tech', startDate: '2026-04', endDate: null },
     { id: 'exp-2', title: 'Full Stack Developer', company: 'Bluepeak Labs', startDate: '2025-08', endDate: '2026-04' },

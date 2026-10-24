@@ -4,6 +4,9 @@ import { ServiceUnavailableError } from '../services/errors';
 
 // Resume, confirmed profile and recommendation results for the current session.
 // recommendations.status: 'idle' | 'loading' | 'ready' | 'unavailable' | 'error'
+// storageStatus: 'loading' until saved guest data is restored at start-up;
+//   'ready' once saving is allowed; 'readonly' if storage couldn't be read
+//   (saving is then disabled so existing data is never overwritten).
 
 export const loadRecommendations = createAsyncThunk(
   'profile/loadRecommendations',
@@ -23,12 +26,23 @@ const profileSlice = createSlice({
   name: 'profile',
   initialState: {
     resume: null,
+    // True when the saved resume metadata points at a file that no longer exists.
+    resumeFileMissing: false,
     profile: null,
-    recommendations: { status: 'idle', items: [], message: null },
+    recommendations: { status: 'idle', items: [], message: null, requestId: null },
+    storageStatus: 'loading',
   },
   reducers: {
     resumeSelected(state, action) {
       state.resume = action.payload;
+      state.resumeFileMissing = false;
+    },
+    guestDataRestored(state, action) {
+      const { profile, resume, resumeFileMissing, storageStatus } = action.payload;
+      state.profile = profile;
+      state.resume = resume;
+      state.resumeFileMissing = resumeFileMissing;
+      state.storageStatus = storageStatus;
     },
     profileSaved(state, action) {
       state.profile = action.payload;
@@ -49,24 +63,43 @@ const profileSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(loadRecommendations.pending, (state) => {
-        state.recommendations = { status: 'loading', items: [], message: null };
+      // Only the latest request may set results; an older one finishing late is ignored.
+      .addCase(loadRecommendations.pending, (state, action) => {
+        state.recommendations = {
+          status: 'loading',
+          items: [],
+          message: null,
+          requestId: action.meta.requestId,
+        };
       })
       .addCase(loadRecommendations.fulfilled, (state, action) => {
-        state.recommendations = { status: 'ready', items: action.payload, message: null };
+        if (action.meta.requestId !== state.recommendations.requestId) return;
+        state.recommendations = {
+          status: 'ready',
+          items: action.payload,
+          message: null,
+          requestId: action.meta.requestId,
+        };
       })
       .addCase(loadRecommendations.rejected, (state, action) => {
+        if (action.meta.requestId !== state.recommendations.requestId) return;
         state.recommendations = {
           status: action.payload?.status ?? 'error',
           items: [],
           message: action.payload?.message ?? action.error.message,
+          requestId: action.meta.requestId,
         };
       });
   },
 });
 
-export const { resumeSelected, profileSaved, profileEntrySaved, profileEntryRemoved } =
-  profileSlice.actions;
+export const {
+  resumeSelected,
+  guestDataRestored,
+  profileSaved,
+  profileEntrySaved,
+  profileEntryRemoved,
+} = profileSlice.actions;
 
 // Saves the confirmed profile and immediately asks for matching jobs.
 export const saveProfile = (profile) => (dispatch) => {
@@ -77,5 +110,7 @@ export const saveProfile = (profile) => (dispatch) => {
 export const selectResume = (state) => state.profile.resume;
 export const selectProfile = (state) => state.profile.profile;
 export const selectRecommendations = (state) => state.profile.recommendations;
+export const selectResumeFileMissing = (state) => state.profile.resumeFileMissing;
+export const selectStorageStatus = (state) => state.profile.storageStatus;
 
 export default profileSlice.reducer;

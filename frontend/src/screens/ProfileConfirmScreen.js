@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { saveProfile, selectProfile } from '../store/profileSlice';
 import { selectUser } from '../store/sessionSlice';
+import { mergeExtractedProfile } from '../utils/profileMerge';
 import { colors, radius, spacing } from '../theme';
 
 const EMPTY_PROFILE = {
@@ -29,6 +30,9 @@ const EMPTY_PROFILE = {
   experienceYears: '',
   experienceMonths: '',
   currentCompany: '',
+  skills: [],
+  experiences: [],
+  education: [],
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -65,15 +69,17 @@ export default function ProfileConfirmScreen({ navigation, route }) {
   const extracted = route.params?.extracted ?? null;
   const returnTo = route.params?.returnTo ?? 'Jobs';
 
+  // A re-uploaded resume is merged into the existing profile, so experience /
+  // education the user added by hand (and their skills) are kept.
   const [values, setValues] = useState(() => ({
     ...EMPTY_PROFILE,
     fullName: user?.name ?? '',
     email: user?.email ?? '',
-    ...profile,
-    ...extracted,
+    ...mergeExtractedProfile(profile, extracted),
   }));
   const [locationDraft, setLocationDraft] = useState('');
   const [preferredDraft, setPreferredDraft] = useState('');
+  const [skillDraft, setSkillDraft] = useState('');
   const [errors, setErrors] = useState({});
 
   const update = (key, value) => {
@@ -91,12 +97,25 @@ export default function ProfileConfirmScreen({ navigation, route }) {
     return next;
   };
 
+  const addSkill = (text = skillDraft) => {
+    const skill = text.trim();
+    if (!skill) return values.skills;
+    setSkillDraft('');
+    if (values.skills.some((item) => item.toLowerCase() === skill.toLowerCase())) {
+      return values.skills;
+    }
+    const next = [...values.skills, skill];
+    update('skills', next);
+    return next;
+  };
+
   const submit = () => {
     // Include anything typed but not yet added as a chip.
     const finalValues = {
       ...values,
       currentLocation: values.currentLocation || locationDraft.trim(),
       preferredLocations: preferredDraft.trim() ? addPreferred() : values.preferredLocations,
+      skills: skillDraft.trim() ? addSkill() : values.skills,
     };
     const nextErrors = validate(finalValues);
     setErrors(nextErrors);
@@ -295,13 +314,43 @@ export default function ProfileConfirmScreen({ navigation, route }) {
             </View>
           </Field>
 
-          <Field label="Current Company" last>
+          <Field label="Current Company">
             <TextInput
               style={styles.input}
               value={values.currentCompany}
               onChangeText={(text) => update('currentCompany', text)}
             />
           </Field>
+
+          <Field label="Skills" last={values.skills.length === 0}>
+            <TextInput
+              style={styles.input}
+              value={skillDraft}
+              onChangeText={setSkillDraft}
+              onSubmitEditing={() => addSkill()}
+              placeholder="Add a skill and press enter"
+              placeholderTextColor="#9AA1AB"
+              returnKeyType="done"
+              blurOnSubmit={false}
+              accessibilityLabel="Add skill"
+            />
+          </Field>
+          {values.skills.length > 0 && (
+            <View style={[styles.chips, styles.chipsLast]}>
+              {values.skills.map((skill) => (
+                <LocationChip
+                  key={skill}
+                  label={skill}
+                  onRemove={() =>
+                    update(
+                      'skills',
+                      values.skills.filter((item) => item !== skill)
+                    )
+                  }
+                />
+              ))}
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -471,6 +520,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: -spacing.sm,
     marginBottom: spacing.lg,
+  },
+  chipsLast: {
+    marginBottom: 0,
   },
   chip: {
     flexDirection: 'row',

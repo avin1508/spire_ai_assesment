@@ -1,7 +1,7 @@
 # Progress
 
 **Current phase:** Phase 2: UI development — Recommended jobs UI and resume-to-recommendations flow (waiting for review)
-**Current prompt:** #17
+**Current prompt:** #22
 **Last updated:** 2026-10-24
 
 ## Locked feature scope
@@ -59,8 +59,11 @@ The core assessment requirements come first. Other features must not break them.
 - [x] Profile screen add / edit icons made display-only, not clickable (Prompt #13)
 - [x] Real interactive map (Leaflet + OpenStreetMap tiles in a WebView), 120 mock jobs in 10 cities, clustering, map/list (Prompt #14; committed by the user; pin preview and list/filters not fully verified)
 - [x] Shared Google-only guest login sheet, opened from all protected entry points through Redux + `useRequireAuth` (Prompt #15)
+- [x] Apply requires login for guests on every job (Prompt #17)
+- [x] **Phase A — guest device storage** (Prompt #22): profile, skills, experience, education and resume details saved in AsyncStorage (guest namespace); resume file copied into the app's document folder; missing-file and corrupt-data handling; re-upload keeps manual and edited entries; 25 unit tests (`npm test`); emulator scenarios D1–D6 plus regression passed
 
 ### In progress
+- [ ] Review of Phase A (waiting for approval before Phase B)
 - [ ] Review of Prompts #14–#15
 - [ ] Finish verifying Prompt #14: pin preview, list view, search and filters on the map, current location
 

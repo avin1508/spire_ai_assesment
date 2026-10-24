@@ -6,6 +6,7 @@ import Button from '../components/Button';
 import { useDispatch } from 'react-redux';
 import { resumeSelected } from '../store/profileSlice';
 import { pickResume } from '../utils/pickResume';
+import { persistGuestResume } from '../storage/resumeFiles';
 import { formatFileSize } from '../utils/format';
 import { colors, radius, spacing } from '../theme';
 
@@ -29,8 +30,25 @@ export default function ResumeConfirmScreen({ navigation, route }) {
     }
   };
 
-  const confirm = () => {
-    dispatch(resumeSelected(file));
+  const [saving, setSaving] = useState(false);
+
+  // Copy the file into permanent storage first. Only a successful copy
+  // replaces the saved resume; on failure the existing resume is untouched.
+  const confirm = async () => {
+    setSaving(true);
+    let saved;
+    try {
+      saved = await persistGuestResume(file);
+    } catch (error) {
+      console.warn('[ResumeConfirm] could not copy resume:', error?.message ?? error);
+      setSaving(false);
+      Alert.alert(
+        "Couldn't save this file",
+        'Please try again, or choose a different file. Your current resume has not been changed.'
+      );
+      return;
+    }
+    dispatch(resumeSelected(saved));
     navigation.replace('ProfileProcessing', { returnTo: route.params.returnTo });
   };
 
@@ -66,7 +84,7 @@ export default function ResumeConfirmScreen({ navigation, route }) {
       </View>
 
       <View style={styles.footer}>
-        <Button label="Yes, continue" onPress={confirm} />
+        <Button label="Yes, continue" onPress={confirm} loading={saving} />
         <Button
           label="Choose a different file"
           variant="outline"

@@ -111,7 +111,16 @@ Google sign-in doesn't work in Expo Go. It needs a development build or APK (`np
 
 ## Testing
 
-There are no automated tests yet. Static checks:
+Unit tests (guest storage, start-up restore and profile-merge logic; Node's built-in test runner, no extra packages):
+
+```bash
+cd frontend
+npm test
+```
+
+Guest data (profile, skills, experience, education, resume details) is saved on the device in AsyncStorage under a guest-only namespace (`spire:guest:*`). The resume file is copied into the app's private document folder, so both survive restarts.
+
+Static checks:
 
 ```bash
 cd frontend

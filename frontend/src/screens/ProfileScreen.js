@@ -6,7 +6,7 @@ import RoundIconButton from '../components/RoundIconButton';
 import Button from '../components/Button';
 import useResumeUpload from '../hooks/useResumeUpload';
 import useRequireAuth from '../hooks/useRequireAuth';
-import { selectProfile, selectResume } from '../store/profileSlice';
+import { selectProfile, selectResume, selectResumeFileMissing } from '../store/profileSlice';
 import { formatDateRange, getInitials } from '../utils/format';
 import { colors, radius, spacing } from '../theme';
 
@@ -17,6 +17,7 @@ const PREVIEW_EXPERIENCES = 2;
 export default function ProfileScreen({ navigation }) {
   const profile = useSelector(selectProfile);
   const resume = useSelector(selectResume);
+  const resumeFileMissing = useSelector(selectResumeFileMissing);
   const uploadResume = useResumeUpload({ returnTo: 'Profile' });
   // Settings and resume download need an account; guests get the login sheet.
   const { requireAuth } = useRequireAuth();
@@ -90,6 +91,9 @@ export default function ProfileScreen({ navigation }) {
               icon="calendar-outline"
               text={`${profile.experienceYears} Years ${profile.experienceMonths} Months`}
             />
+            {profile.skills?.length > 0 && (
+              <DetailRow icon="construct-outline" label="Skills :" text={profile.skills.join(', ')} />
+            )}
           </View>
         </View>
 
@@ -97,16 +101,21 @@ export default function ProfileScreen({ navigation }) {
           <View style={styles.pdfIcon}>
             <Text style={styles.pdfText}>{resume ? 'PDF' : '—'}</Text>
           </View>
-          <Text style={styles.resumeName} numberOfLines={1}>
-            {resume ? resume.name : 'No resume uploaded'}
-          </Text>
+          <View style={styles.resumeText}>
+            <Text style={styles.resumeName} numberOfLines={1}>
+              {resume ? resume.name : 'No resume uploaded'}
+            </Text>
+            {resume && resumeFileMissing && (
+              <Text style={styles.resumeWarning}>File missing — please upload it again</Text>
+            )}
+          </View>
           <RoundIconButton
             icon="arrow-up"
             label={resume ? 'Replace resume' : 'Upload resume'}
             variant="solid"
             onPress={uploadResume}
           />
-          {resume && (
+          {resume && !resumeFileMissing && (
             <View style={styles.resumeAction}>
               <RoundIconButton
                 icon="arrow-down"
@@ -338,11 +347,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.surface,
   },
-  resumeName: {
+  resumeText: {
     flex: 1,
     marginHorizontal: spacing.md,
+  },
+  resumeName: {
     fontSize: 16,
     color: colors.text,
+  },
+  resumeWarning: {
+    marginTop: 2,
+    fontSize: 13,
+    color: colors.danger,
   },
   resumeAction: {
     marginLeft: spacing.md,

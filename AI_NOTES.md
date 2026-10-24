@@ -1868,3 +1868,96 @@ one correction need to if the user will not login na so he can not apply ok add 
   - Android export built.
   - Emulator, as a guest: All Jobs → View jobs (120) → "React Native Developer at Northwind Tech" → Apply showed the locked button → tapping it opened the GUEST MODE sheet with Continue with Google. No errors.
 - **AI mistakes:** none in this change. The original gap came from Prompt #11's design, where the missing-URL case was checked before the guest case.
+
+---
+
+## Prompts #18–#20: Guest-mode review, logout design, final decisions (review only)
+
+- **Date/time:** 2026-10-24, about 14:20–14:50 IST
+- **AI tool:** Claude
+- **Summary:**
+  - #18 reviewed the current guest flow and proposed guest-to-account rules.
+  - #19 added scenario G: logout through the existing Profile Settings icon.
+  - #20 confirmed the final decisions: a Settings sheet built on `BottomSheet` with the account email and Log out; reset to Jobs → All Jobs; separate storage namespaces; local JWT deletion; confirmation first; guest data never transferred is kept.
+- **No files were changed** in #18–#20.
+
+---
+
+## Prompt #21: first Phase A attempt (discarded by the user)
+
+- **Date/time:** 2026-10-24, about 14:55–15:30 IST
+- Phase A was implemented and tested, then **all of those changes were discarded** from the working tree, including the notes for #18–#21. The tree was back at `76c5ef4`.
+- The user then sent #22 (below) asking for Phase A again. It was rebuilt from scratch on `76c5ef4` and fully re-tested.
+
+---
+
+## Prompt #22: Phase A — guest device storage (implementation)
+
+- **Date/time:** 2026-10-24, about 15:35–15:55 IST
+- **AI tool:** Claude
+- **Exact prompt:** the "# Phase A: Guest Mode Device Storage — Implementation" message (sections 1–7: strict rules; dependencies limited to AsyncStorage and expo-file-system; guest data saved on the device; resume file handling; start-up and Redux; mandatory testing; completion criteria; Phase A only).
+
+### Dependencies (installed with `npx expo install`, SDK 58.0.19)
+- `@react-native-async-storage/async-storage` **2.2.0**
+- `expo-file-system` **~58.0.11**. It was already present as a dependency of another package; it's now our own. The installed API is the SDK 54+ `File` / `Directory` / `Paths` API, checked in `node_modules/expo-file-system/build`.
+- `expo-secure-store` was **not** added (it belongs to the auth phase). redux-persist was **not** used.
+
+### Files
+- **New:**
+  - `src/storage/keys.js`: `spire:guest:*` and `spire:account:<userId>:*`. The account side is only prepared; nothing writes to it.
+  - `src/storage/guestSnapshot.js`: versioned save format with validation (metadata only, never file contents).
+  - `src/storage/latestWriter.js`: one write at a time; only the newest pending value is written.
+  - `src/storage/restore.js`: pure start-up restore decision.
+  - `src/storage/guestStore.js`: AsyncStorage. Unreadable data is backed up under `…:corrupt:<time>`; a read error means read-only mode.
+  - `src/storage/resumeFiles.js`: copies the file into `Paths.document/guest/resume/`; old copies are removed only after the new copy succeeds; existence check.
+  - `src/store/guestPersistence.js`: Redux listener that saves on changes to the profile or resume, plus `restoreGuestData`.
+  - `src/utils/profileMerge.js`: merge rules for a re-uploaded resume.
+  - `tests/storage.test.mjs`, `tests/profileMerge.test.mjs`.
+- **Modified:**
+  - `App.js`: shows a loading state until restore finishes (no flash of an empty profile).
+  - `src/store/index.js`: adds the listener middleware.
+  - `src/store/profileSlice.js`: `storageStatus`, `resumeFileMissing`, `guestDataRestored`; recommendations ignore replies from older requests.
+  - `src/utils/pickResume.js`: `copyToCacheDirectory: false`.
+  - `src/screens/ResumeConfirmScreen.js`: copies first; on failure, an alert, and the existing resume is unchanged.
+  - `src/screens/ProfileConfirmScreen.js`: merges a re-upload into the profile; Skills chip field.
+  - `src/screens/ProfileScreen.js`: Skills row; "File missing — please upload it again"; Download hidden when the file is missing.
+  - `src/screens/ExperienceFormScreen.js`, `EducationFormScreen.js`: `source: 'manual'`.
+  - `src/data/mockResume.js`: sample skills.
+  - `package.json`: two new packages and a `test` script.
+
+### Commands and results
+- `npm test` (Node's built-in test runner; no test framework installed): **25/25 passed**. 24 at first; a 25th was added for bug 3 below. It failed first, then passed after the fix.
+- `npx expo-doctor`: **20/20** (several runs). `npx expo export --platform android`: built (several runs).
+
+### Emulator results (Pixel_5, Expo Go)
+- **D1 First launch** after wiping Expo Go's data: empty guest, "Build your profile". ✅
+- **D2 Restart:** resume flow plus skill "Leadership" plus manual experience, then a full stop and relaunch. Details, 6 skills, experiences, resume (file present) and Recommended (5) were restored. ✅
+- **D3 Edits survive restart:** edited a resume entry to "Frontend Developer II", restarted, and it was still there. ✅
+- **D4 Re-upload:** 5 unique experiences; the edited entry and the manual entry were kept; the skill was kept; only one resume copy left on disk. ✅
+- **D5 Missing file:** deleted the copy with `adb root`, restarted. Profile intact, warning shown, Download hidden, Replace available. ✅
+- **D6 Corrupt data:** set the stored record to `{broken json` with `sqlite3`, restarted. No crash, empty guest, backup key created, expected warning logged. Saving worked afterwards. ✅
+- **Guest namespace on the device:** the AsyncStorage database contained only `spire:guest:data:v1` (plus the corruption backup); no `spire:account:*` keys. ✅
+- **Regression:** All Jobs 120 → "Pune" search gives 12 → Job Details and Apply → map view "View jobs (12)" (in sync) → Recommended with Verified gives 4. ✅
+- **Not checked on the device:**
+  - many quick overlapping saves (unit-tested only)
+  - an AsyncStorage read failure / read-only mode (unit-tested `resolveRestore`, plus code review)
+  - a failed resume copy (code review only; the failure path was seen in the discarded #21 run)
+  - manual education (no way to add it in the UI)
+  - iOS
+
+### Bugs found and fixed
+1. **The copy failed in Expo Go** (`Missing 'READ' permission`).
+   - Cause: the picker's cache copy sits in `cache/DocumentPicker/`, outside the folder Expo Go lets each project read.
+   - Fix: pick without the cache copy and copy straight from the `content://` address, which `expo-file-system`'s permission check allows.
+2. **A failed copy could replace a good resume.** The earlier design continued with the temporary file. Now nothing changes on failure: an alert, and the existing resume is kept.
+3. **Duplicate entry IDs on re-upload.** Editing a resume entry keeps its ID and marks it manual, so a re-upload brought back a resume entry with the same ID (a duplicate row with broken edit and delete). A test reproduced it. Fix: a manual entry wins over an incoming resume entry with the same ID. Verified on the device in D4.
+4. **Out-of-order recommendation replies:** an older reply could overwrite a newer one. Fixed by checking each reply belongs to the latest request.
+
+### Not app bugs (checked)
+- "Expo Go isn't responding" right after the data wipe. Android's log: `ANR … executing service host.exp.exponent/.fcm.ExpoFcmMessagingService`, which is Expo Go's own notification service. The app recovered after "Wait".
+
+### Known limitations
+- Read-only mode (storage can't be read) has no message in the UI; saving is just switched off for that session.
+- Manual education can't be added in the UI (Education icons are display-only since #13; there's no "Show all").
+- Recommendations aren't saved; they're reloaded from the mock after restore.
+- After corruption recovery, the next save overwrites the broken record; the backup copy stays.

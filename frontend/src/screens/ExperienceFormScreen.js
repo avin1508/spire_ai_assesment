@@ -51,6 +51,8 @@ export default function ExperienceFormScreen({ navigation, route }) {
         list: 'experiences',
         entry: {
           id: entry?.id ?? `exp-${Date.now()}`,
+          // Added or edited by hand: kept when the resume is re-uploaded.
+          source: 'manual',
           title: values.title.trim(),
           company: values.company.trim(),
           startDate: fromInput(values.start),

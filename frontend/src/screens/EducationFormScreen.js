@@ -44,6 +44,8 @@ export default function EducationFormScreen({ navigation, route }) {
         list: 'education',
         entry: {
           id: entry?.id ?? `edu-${Date.now()}`,
+          // Added or edited by hand: kept when the resume is re-uploaded.
+          source: 'manual',
           institution: values.institution.trim(),
           degree: values.degree.trim(),
           field: values.field.trim(),
