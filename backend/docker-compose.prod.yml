@@ -75,5 +75,32 @@ services:
     logging: *logging
     restart: always
 
+  # Resume-parse worker (BullMQ): same production image, different entry point.
+  worker:
+    image: spire-ai-backend:prod
+    command: ["node", "src/worker.js"]
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in backend/.env}@redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    # The image's HTTP health check is for the API; the worker serves no HTTP.
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    init: true
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    logging: *logging
+    restart: always
+
 volumes:
   redis-data:

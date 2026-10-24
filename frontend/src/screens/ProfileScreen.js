@@ -1,12 +1,21 @@
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import ScreenHeader from '../components/ScreenHeader';
 import RoundIconButton from '../components/RoundIconButton';
 import Button from '../components/Button';
 import useResumeUpload from '../hooks/useResumeUpload';
 import useRequireAuth from '../hooks/useRequireAuth';
-import { selectProfile, selectResume, selectResumeFileMissing } from '../store/profileSlice';
+import {
+  resumeFileMissingDetected,
+  selectProfile,
+  selectResume,
+  selectResumeFileMissing,
+} from '../store/profileSlice';
+import { downloadResume } from '../services/resumeService';
+import { resumeTypeLabel } from '../utils/resumeProcessing';
 import { formatDateRange, getInitials } from '../utils/format';
 import { colors, radius, spacing } from '../theme';
 
@@ -19,8 +28,30 @@ export default function ProfileScreen({ navigation }) {
   const resume = useSelector(selectResume);
   const resumeFileMissing = useSelector(selectResumeFileMissing);
   const uploadResume = useResumeUpload({ returnTo: 'Profile' });
-  // Settings and resume download need an account; guests get the login sheet.
+  const dispatch = useDispatch();
+  const [downloading, setDownloading] = useState(false);
+  // Settings need an account; guests get the login sheet. Downloading your
+  // own resume works for guests too.
   const { requireAuth } = useRequireAuth();
+
+  // Downloads the resume from the server and opens the share / "open with" sheet.
+  const openResume = async () => {
+    if (downloading || !resume?.resumeId) return;
+    setDownloading(true);
+    try {
+      const file = await downloadResume(resume);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri, { mimeType: resume.mimeType ?? undefined, dialogTitle: resume.name });
+      } else {
+        Alert.alert('Resume downloaded', 'Opening files is not supported on this device.');
+      }
+    } catch (error) {
+      if (error?.status === 404) dispatch(resumeFileMissingDetected());
+      Alert.alert("Couldn't open your resume", error?.message ?? 'Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  };
   const backToProfile = { name: 'Main', params: { screen: 'Profile' } };
 
   const settingsButton = (
@@ -99,14 +130,14 @@ export default function ProfileScreen({ navigation }) {
 
         <View style={styles.resumeCard}>
           <View style={styles.pdfIcon}>
-            <Text style={styles.pdfText}>{resume ? 'PDF' : '—'}</Text>
+            <Text style={styles.pdfText}>{resumeTypeLabel(resume)}</Text>
           </View>
           <View style={styles.resumeText}>
             <Text style={styles.resumeName} numberOfLines={1}>
               {resume ? resume.name : 'No resume uploaded'}
             </Text>
             {resume && resumeFileMissing && (
-              <Text style={styles.resumeWarning}>File missing — please upload it again</Text>
+              <Text style={styles.resumeWarning}>File not available — please upload it again</Text>
             )}
           </View>
           <RoundIconButton
@@ -117,21 +148,11 @@ export default function ProfileScreen({ navigation }) {
           />
           {resume && !resumeFileMissing && (
             <View style={styles.resumeAction}>
-              <RoundIconButton
-                icon="arrow-down"
-                label="Download resume"
-                variant="solid"
-                onPress={() =>
-                  requireAuth(
-                    () =>
-                      Alert.alert(
-                        'Not available yet',
-                        'Downloading will work once resumes are stored on the server.'
-                      ),
-                    backToProfile
-                  )
-                }
-              />
+              {downloading ? (
+                <ActivityIndicator color={colors.primary} accessibilityLabel="Downloading resume" />
+              ) : (
+                <RoundIconButton icon="arrow-down" label="Download resume" variant="solid" onPress={openResume} />
+              )}
             </View>
           )}
         </View>

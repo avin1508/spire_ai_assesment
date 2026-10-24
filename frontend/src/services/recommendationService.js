@@ -1,7 +1,4 @@
-import { mockRecommendations } from '../data/mockRecommendations';
-
-// Short wait so the "Agent Sigma is on the hunt" loading state is visible.
-const MOCK_DELAY_MS = 1500;
+import { ServiceUnavailableError } from './errors';
 
 /**
  * Resolves with recommended jobs for a confirmed profile. Each job:
@@ -17,11 +14,10 @@ const MOCK_DELAY_MS = 1500;
  *   gapSkills?: string[],       // skills the job needs that the profile lacks
  * }
  *
- * MOCK: returns hardcoded sample jobs (src/data/mockRecommendations.js) for
- * every profile. Replace with the backend matching API in a later phase;
- * on failure it should throw (ServiceUnavailableError when not reachable).
+ * Not built yet (a later phase): always rejects with ServiceUnavailableError,
+ * so the Recommended tab says recommendations aren't ready instead of
+ * showing sample jobs.
  */
 export async function fetchRecommendations(profile) {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS));
-  return mockRecommendations;
+  throw new ServiceUnavailableError('Job recommendations are coming soon. Your profile has been saved.');
 }

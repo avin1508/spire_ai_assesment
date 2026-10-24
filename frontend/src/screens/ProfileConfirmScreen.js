@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -13,9 +14,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
-import { saveProfile, selectProfile } from '../store/profileSlice';
+import { profileConfirmed, saveProfile, selectProfile } from '../store/profileSlice';
 import { selectUser } from '../store/sessionSlice';
+import { confirmResume } from '../services/resumeService';
+import { discardStagedResumes, removeLegacyLocalResumes } from '../storage/resumeFiles';
 import { mergeExtractedProfile } from '../utils/profileMerge';
+import { confirmedResumeMetadata } from '../utils/resumeProcessing';
 import { colors, radius, spacing } from '../theme';
 
 const EMPTY_PROFILE = {
@@ -67,7 +71,11 @@ export default function ProfileConfirmScreen({ navigation, route }) {
   const profile = useSelector(selectProfile);
   const user = useSelector(selectUser);
   const extracted = route.params?.extracted ?? null;
+  // The newly processed resume (server summary); it becomes the user's resume
+  // only when this profile is saved.
+  const pendingResume = route.params?.pendingResume ?? null;
   const returnTo = route.params?.returnTo ?? 'Jobs';
+  const [saving, setSaving] = useState(false);
 
   // A re-uploaded resume is merged into the existing profile, so experience /
   // education the user added by hand (and their skills) are kept.
@@ -109,7 +117,16 @@ export default function ProfileConfirmScreen({ navigation, route }) {
     return next;
   };
 
-  const submit = () => {
+  const goBack = () =>
+    navigation.popTo(
+      'Main',
+      returnTo === 'Profile'
+        ? { screen: 'Profile', params: { screen: 'ProfileHome' } }
+        : { screen: 'Jobs', params: { screen: 'Recommended' } }
+    );
+
+  const submit = async () => {
+    if (saving) return;
     // Include anything typed but not yet added as a chip.
     const finalValues = {
       ...values,
@@ -121,21 +138,38 @@ export default function ProfileConfirmScreen({ navigation, route }) {
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
-    dispatch(
-      saveProfile({
-        ...finalValues,
-        fullName: finalValues.fullName.trim(),
-        email: finalValues.email.trim(),
-        phone: finalValues.phone.replace(/\s/g, ''),
-        experienceMonths: finalValues.experienceMonths || '0',
-      })
-    );
-    navigation.popTo(
-      'Main',
-      returnTo === 'Profile'
-        ? { screen: 'Profile', params: { screen: 'ProfileHome' } }
-        : { screen: 'Jobs', params: { screen: 'Recommended' } }
-    );
+    const profileToSave = {
+      ...finalValues,
+      fullName: finalValues.fullName.trim(),
+      email: finalValues.email.trim(),
+      phone: finalValues.phone.replace(/\s/g, ''),
+      experienceMonths: finalValues.experienceMonths || '0',
+    };
+
+    if (!pendingResume) {
+      dispatch(saveProfile(profileToSave));
+      goBack();
+      return;
+    }
+
+    // New resume: confirm it on the server first. Only then are the profile
+    // and resume replaced (together); if this fails nothing changes.
+    setSaving(true);
+    let confirmed;
+    try {
+      ({ resume: confirmed } = await confirmResume(pendingResume.resumeId));
+    } catch (error) {
+      setSaving(false);
+      Alert.alert(
+        "Couldn't save your profile",
+        `${error?.message ?? 'Please try again.'} Your previous profile and resume are unchanged.`
+      );
+      return;
+    }
+    dispatch(profileConfirmed({ profile: profileToSave, resume: confirmedResumeMetadata(confirmed) }));
+    discardStagedResumes();
+    removeLegacyLocalResumes();
+    goBack();
   };
 
   return (
@@ -360,10 +394,16 @@ export default function ProfileConfirmScreen({ navigation, route }) {
         )}
         <Pressable
           onPress={submit}
+          disabled={saving}
           accessibilityRole="button"
+          accessibilityState={{ busy: saving, disabled: saving }}
           style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}
         >
-          <Text style={styles.doneText}>Done! Lets get started</Text>
+          {saving ? (
+            <ActivityIndicator color={colors.accent} />
+          ) : (
+            <Text style={styles.doneText}>Done! Lets get started</Text>
+          )}
         </Pressable>
       </View>
     </KeyboardAvoidingView>

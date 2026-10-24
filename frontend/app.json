@@ -31,7 +31,8 @@
           "locationWhenInUsePermission": "Allow Spire.AI to use your location to show jobs near you."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-sharing"
     ]
   }
 }

@@ -163,8 +163,12 @@ export default function RecommendedScreen() {
         />
       ) : (
         <RecommendationStatus
-          status={recommendations.status === 'idle' ? 'loading' : recommendations.status}
-          message={recommendations.message}
+          status={recommendations.status === 'idle' ? 'unavailable' : recommendations.status}
+          message={
+            recommendations.status === 'idle'
+              ? 'Job recommendations are coming soon. Your profile has been saved.'
+              : recommendations.message
+          }
           onRetry={() => dispatch(loadRecommendations(profile))}
         />
       )}

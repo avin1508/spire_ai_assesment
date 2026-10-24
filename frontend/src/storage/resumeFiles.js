@@ -1,44 +1,56 @@
 import { Directory, File, Paths } from 'expo-file-system';
 
-// The guest's resume file is copied into the app's private document
-// directory, under a guest-only folder, so it survives restarts.
+// Local copies of resume files. The confirmed resume lives on the backend;
+// on the device a picked file is only staged (in the cache) so it can be
+// uploaded, and earlier local copies (from before server storage) are
+// removed once a resume is confirmed on the server.
 
-const guestResumeDir = () => new Directory(Paths.document, 'guest', 'resume');
+const stagingRoot = () => new Directory(Paths.cache, 'resume-upload');
+const legacyGuestResumeDir = () => new Directory(Paths.document, 'guest', 'resume');
 
-const safeFileName = (name) => name.replace(/[^\w.-]+/g, '_').slice(-80) || 'resume';
+// Keeps the real name (it becomes the upload's file name), minus path
+// separators and control characters.
+const stagedFileName = (name) =>
+  String(name ?? '')
+    .replace(/[\u0000-\u001f\u007f/\\]+/g, '_')
+    .trim()
+    .slice(-120) || 'resume';
 
 /**
- * Copies a picked file into permanent guest storage, then removes older guest
- * resume copies. Resolves with metadata pointing at the new copy.
- * Throws if the copy fails — nothing existing is deleted in that case.
+ * Copies a picked file into its own staging folder (removing earlier staged
+ * files) and resolves with metadata pointing at the copy. The picker's
+ * content:// URI may stop being readable later, so uploads use this copy.
+ * Throws if the copy fails.
  */
-export async function persistGuestResume(file) {
-  const dir = guestResumeDir();
+export async function stageResumeForUpload(file) {
+  const root = stagingRoot();
+  root.create({ intermediates: true, idempotent: true });
+  const dir = new Directory(root, String(Date.now()));
   dir.create({ intermediates: true, idempotent: true });
-
-  const destination = new File(dir, `${Date.now()}-${safeFileName(file.name)}`);
+  const destination = new File(dir, stagedFileName(file.name));
   await new File(file.uri).copy(destination);
-
-  // Only after the new copy exists, remove previous copies.
-  dir.list().forEach((entry) => {
-    if (entry instanceof File && entry.uri !== destination.uri) {
-      try {
-        entry.delete();
-      } catch (error) {
-        console.warn('[resumeFiles] could not delete old copy:', error?.message ?? error);
-      }
-    }
-  });
-
-  return { ...file, uri: destination.uri, persisted: true };
+  removeEntries(root, dir.uri);
+  return { ...file, uri: destination.uri };
 }
 
-// True if a file exists at `uri`; false if it's missing or can't be checked.
-export function resumeFileExists(uri) {
-  if (!uri) return false;
+// Removes staged upload copies (after confirmation or when abandoned).
+export function discardStagedResumes() {
+  removeEntries(stagingRoot());
+}
+
+// Removes resume copies saved on the device before resumes were stored on
+// the server; called once a resume is confirmed on the server.
+export function removeLegacyLocalResumes() {
+  removeEntries(legacyGuestResumeDir());
+}
+
+function removeEntries(dir, keepUri = null) {
   try {
-    return new File(uri).exists;
-  } catch {
-    return false;
+    if (!dir.exists) return;
+    dir.list().forEach((entry) => {
+      if (entry.uri !== keepUri) entry.delete();
+    });
+  } catch (error) {
+    console.warn('[resumeFiles] cleanup failed:', error?.message ?? error);
   }
 }

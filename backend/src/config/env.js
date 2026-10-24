@@ -50,3 +50,12 @@ export function describeRedisTarget(url) {
     return 'invalid REDIS_URL';
   }
 }
+
+// Gemini credentials and model for resume parsing (used by the worker only).
+// The key is never logged or returned.
+export function getGeminiConfig() {
+  return {
+    apiKey: required('GEMINI_API_KEY'),
+    model: required('GEMINI_MODEL'),
+  };
+}

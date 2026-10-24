@@ -4,23 +4,18 @@
 //
 // loadResult: { status: 'ok' | 'corrupt', data: { profile, resume } }
 //           | { status: 'failed' }
-// fileExists: (uri) => boolean
 //
 // → { profile, resume, resumeFileMissing, storageStatus }
 //   storageStatus 'readonly' means storage couldn't be read: nothing is
 //   restored and saving stays off, so the stored data is never overwritten.
-export function resolveRestore(loadResult, fileExists) {
+export function resolveRestore(loadResult) {
   if (!loadResult || loadResult.status === 'failed') {
     return { profile: null, resume: null, resumeFileMissing: false, storageStatus: 'readonly' };
   }
   const { profile = null, resume = null } = loadResult.data ?? {};
-  let resumeFileMissing = false;
-  if (resume) {
-    try {
-      resumeFileMissing = !fileExists(resume.uri);
-    } catch {
-      resumeFileMissing = true;
-    }
-  }
+  // The resume file lives on the server (resumeId). A resume saved before
+  // that (device copy only) can't be downloaded, so it shows as missing and
+  // the user can upload it again.
+  const resumeFileMissing = Boolean(resume && !resume.resumeId);
   return { profile, resume, resumeFileMissing, storageStatus: 'ready' };
 }

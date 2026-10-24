@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useSelector } from 'react-redux';
 import Button from '../components/Button';
-import { selectResume } from '../store/profileSlice';
-import { parseResume } from '../services/resumeService';
+import useResumeProcessing from '../hooks/useResumeProcessing';
+import { pickResume } from '../utils/pickResume';
+import { statusText, stepStates, toProfileFormValues } from '../utils/resumeProcessing';
 import { colors, radius, spacing } from '../theme';
 
 const STEPS = [
@@ -14,53 +14,43 @@ const STEPS = [
   'Creating your skills profile',
 ];
 
-// How often the next step is highlighted while parsing is in progress.
-// The parser reports no real progress, so this is a UI-only indicator; all
-// steps are marked done only when parsing actually resolves.
-const STEP_INTERVAL_MS = 1000;
-
-// Sends the confirmed resume for parsing. On success goes to the profile form
-// with the extracted values; on failure says so and offers manual entry.
+// Uploads the confirmed resume and follows its processing on the server.
+// Steps advance only with the stage the server reports (no timers). On
+// success goes to the profile form with the extracted values; on failure
+// shows the reason with Retry (or "Choose a different file" when retrying
+// can't help). The current confirmed resume/profile are never touched here.
 export default function ProfileProcessingScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const resume = useSelector(selectResume);
-  const returnTo = route.params?.returnTo;
-  const [error, setError] = useState(null);
-  const [activeStep, setActiveStep] = useState(0);
-  const [done, setDone] = useState(false);
+  const { file, returnTo } = route.params;
+  const { state, retry } = useResumeProcessing(file);
 
-  const run = useCallback(async () => {
-    setError(null);
-    setDone(false);
-    setActiveStep(0);
-    try {
-      const extracted = await parseResume(resume);
-      setDone(true);
-      setTimeout(() => navigation.replace('ProfileConfirm', { extracted, returnTo }), 500);
-    } catch (err) {
-      setError(err.message);
-    }
-  }, [navigation, resume, returnTo]);
+  const failed = state.phase === 'failed';
+  const done = state.phase === 'completed';
+  const steps = stepStates(state, STEPS.length);
+  const status = statusText(state);
 
+  // Show the ✓ briefly, then the profile form. Cancelled if the user leaves.
   useEffect(() => {
-    run();
-  }, [run]);
-
-  const failed = error != null;
-
-  useEffect(() => {
-    if (failed || done) return undefined;
-    const timer = setInterval(
-      () => setActiveStep((step) => Math.min(step + 1, STEPS.length - 1)),
-      STEP_INTERVAL_MS
+    if (!done) return undefined;
+    const timer = setTimeout(
+      () =>
+        navigation.replace('ProfileConfirm', {
+          extracted: toProfileFormValues(state.profile),
+          pendingResume: state.file,
+          returnTo,
+        }),
+      500
     );
-    return () => clearInterval(timer);
-  }, [failed, done]);
+    return () => clearTimeout(timer);
+  }, [done, navigation, returnTo, state.file, state.profile]);
 
-  const stepState = (index) => {
-    if (failed) return 'failed';
-    if (done || index < activeStep) return 'done';
-    return index === activeStep ? 'active' : 'pending';
+  const chooseAnother = async () => {
+    try {
+      const next = await pickResume();
+      if (next) navigation.replace('ResumeConfirm', { file: next, returnTo });
+    } catch {
+      Alert.alert("Couldn't open your files", 'Please try again.');
+    }
   };
 
   return (
@@ -81,32 +71,32 @@ export default function ProfileProcessingScreen({ navigation, route }) {
         </Text>
         <Text style={styles.subheading}>
           {failed
-            ? 'You can enter your details yourself instead.'
+            ? 'Your current profile and resume have not been changed.'
             : 'Agent Sigma is reading your resume to understand your experience and skills.'}
         </Text>
 
         <View style={styles.steps}>
           {STEPS.map((step, index) => {
-            const state = stepState(index);
+            const stepState = steps[index];
             return (
               <View key={step} style={styles.step}>
-                {state === 'active' ? (
+                {stepState === 'active' ? (
                   <ActivityIndicator size="small" color={colors.primary} style={styles.stepIcon} />
                 ) : (
                   <Ionicons
                     name={
-                      state === 'done'
+                      stepState === 'done'
                         ? 'checkmark-circle'
-                        : state === 'failed'
+                        : stepState === 'failed'
                           ? 'remove-circle-outline'
                           : 'ellipse-outline'
                     }
                     size={20}
-                    color={state === 'done' ? colors.success : colors.textMuted}
+                    color={stepState === 'done' ? colors.success : colors.textMuted}
                     style={styles.stepIcon}
                   />
                 )}
-                <Text style={[styles.stepText, state === 'pending' && styles.stepPending]}>
+                <Text style={[styles.stepText, stepState === 'pending' && styles.stepPending]}>
                   {step}
                 </Text>
               </View>
@@ -114,21 +104,26 @@ export default function ProfileProcessingScreen({ navigation, route }) {
           })}
         </View>
 
+        {status ? <Text style={styles.status}>{status}</Text> : null}
+
         {failed && (
           <View style={styles.notice}>
             <Ionicons name="information-circle-outline" size={20} color={colors.fitText} />
-            <Text style={styles.noticeText}>{error}</Text>
+            <Text style={styles.noticeText}>{state.error?.message ?? 'Something went wrong.'}</Text>
           </View>
         )}
       </View>
 
       {failed && (
         <View style={styles.footer}>
-          <Button
-            label="Fill in details manually"
-            onPress={() => navigation.replace('ProfileConfirm', { extracted: null, returnTo })}
-          />
-          <Button label="Try again" variant="text" onPress={run} style={styles.retry} />
+          {state.error?.retryable ? (
+            <>
+              <Button label="Try again" onPress={retry} />
+              <Button label="Choose a different file" variant="text" onPress={chooseAnother} style={styles.retry} />
+            </>
+          ) : (
+            <Button label="Choose a different file" onPress={chooseAnother} />
+          )}
         </View>
       )}
     </View>
@@ -192,6 +187,12 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   stepPending: {
+    color: colors.textMuted,
+  },
+  status: {
+    marginTop: spacing.md,
+    fontSize: 14,
+    textAlign: 'center',
     color: colors.textMuted,
   },
   notice: {

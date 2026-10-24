@@ -200,6 +200,11 @@ Google sign-in doesn't work in Expo Go. It needs a development build or APK (`np
 | GET | `/api/jobs/map` | Map markers for `bbox=west,south,east,north` and `zoom` (0–20): `{ zoom, total, clusters: [{ id, latitude, longitude, count, officeCount, companyCount, bounds }], offices: [{ id, latitude, longitude, count, companyName, area, city, bounds, jobId? }] }` |
 | GET | `/api/jobs/summary` | `{ total, bounds }` for the filters (bounds is `null` when nothing matches) |
 | GET | `/api/jobs/filter-options` | Values and counts per All Filters section, for the jobs matching the given filters |
+| POST | `/api/resumes` | Upload a resume (multipart field `file`, PDF/DOCX ≤ 5 MB, header `X-Guest-Session`, optional `Idempotency-Key`) → `202 { jobId, status: "queued", pollAfterMs, file }`. 401 without a guest session, 413 too large, 415 not PDF/DOCX (checked by content), 503 queue unavailable |
+| GET | `/api/resumes/jobs/:jobId` | Processing status: `{ status: queued|processing|completed|failed, stage, profile (when completed), error { code, message, retryable }, pollAfterMs }`. Another guest's job → 404 |
+| POST | `/api/resumes/jobs/:jobId/retry` | Re-queue a failed, retryable job (409 if not retryable) |
+| POST | `/api/resumes/:resumeId/confirm` | Make it the guest's resume after the profile is saved; the previous resume is deleted |
+| GET | `/api/resumes/:resumeId/download` | The guest's confirmed resume file (owner only, `Cache-Control: private, no-store`) |
 | GET | `/api/jobs/:jobId` | The full job, including the description; 400 for a malformed id, 404 if it doesn't exist |
 
 **Shared filters** (the same meaning on every endpoint):

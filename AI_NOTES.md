@@ -2381,3 +2381,61 @@ one correction need to if the user will not login na so he can not apply ok add 
   - frontend `npm test` 20/20; Android export built;
   - on the emulator: India view shows numbered pins (Bengaluru 69) with "View companies (30)" / "View jobs (500)"; the Bengaluru card "70 jobs in this area · 30 companies"; zoom in → smaller pins and bubbles such as "1 Granite Insurance".
 - **Note:** with the demo dataset most company offices have 1 job, so bubbles often show "1". Real data with many jobs per office gives larger counts, like the reference.
+
+## Prompt #34: Phase 1 resume upload and profile processing
+
+- **Date/time:** 2026-10-24, about 20:00–23:15 IST
+- **AI tool:** Claude
+- **Exact prompt:** "# Final Implementation Prompt — Phase 1 Resume Upload & Profile Processing" (upload → storage → BullMQ → text extraction → Gemini → polling → confirm → save + download; PDF/DOCX ≤ 5 MB; guest session ownership; confirm-before-replace; Retry without manual bypass; no recovery across restarts; cleanup; tests).
+
+### Built
+- **Backend:**
+  - `routes/resumes.routes.js`: 5 endpoints; `X-Guest-Session` UUID, stored only as a SHA-256 hash; 404 for anyone else's data.
+  - `services/resumes.service.js`: idempotent upload, status, retry, confirm (deletes the superseded resume), download, cleanup.
+  - `models/resume.model.js`; `storage/resumeFiles.js` (GridFS).
+  - `services/resumeFile.js` (content checks, safe names), `resumeText.js` (unpdf / mammoth), `gemini.js` (@google/genai interactions API with a JSON schema; `maxRetries: 0`, 60 s timeout), `resumeProfile.js` (server-side validation), `resumeErrors.js`.
+  - `queue/resumeQueue.js` (BullMQ + ioredis), `workers/resumeWorker.js`, `worker.js` (worker + 15-minute cleanup).
+  - `worker` service in both Compose files; `GEMINI_MODEL` in `.env.example`.
+- **Frontend:**
+  - Utilities and hooks: `utils/resumeProcessing.js`, `hooks/useResumeProcessing.js`, `storage/guestSession.js`.
+  - `services/resumeService.js` (real API), `storage/resumeFiles.js` (staging only).
+  - Screens:
+    - Processing: real stages, Retry / Choose another, no manual bypass.
+    - ResumeConfirm: validation; nothing replaced on continue.
+    - ProfileConfirm: confirms on the server, then one `profileConfirmed` action.
+    - Profile: real PDF/DOCX label; download + share for guests.
+  - Mock parser removed; mock recommendations no longer triggered (the service reports "coming soon").
+
+### Verification
+- **Tests:** backend `npm test` 90/90; frontend `npm test` 33/33; `expo export` built; `expo-doctor` 20/20.
+- **Live run** (Docker API + worker + Redis + Atlas + **real Gemini `gemini-3.5-flash-lite`**):
+  - PDF: queued → extracting_text → analyzing → completed in about 11–23 s; correct profile; confirm 200; download identical bytes; other guest 404.
+  - DOCX completed; renamed text file 415; text-less PDF `no_text`.
+  - The test records were deleted afterwards.
+- **Not done:** an emulator walk-through of the app screens with a real file (skipped for time).
+
+### Mistakes and fixes
+- **Lock file:** `npm ci` in Docker failed because MongoDB's optional peer `gcp-metadata@^7` conflicts with the Gemini auth library's v8. Fixed with `overrides`, verified with a clean `npm ci` in `node:22.21.1-alpine`.
+- **BullMQ 6:** it needs a constructed `ioredis` client in ESM (the worker logged warnings). Added `ioredis@6.0.0`.
+- **Experience years:** Gemini first computed 4 y 0 m for jobs running to "present" (about 6 y 4 m). The prompt now includes the current month; the re-run gave 6 y 4 m.
+- **Shell editing:** an inline shell edit was mangled by bash backticks; it was caught by reading the result and fixed with the Edit tool.
+- **Old bug fixed:** the backend container became unhealthy after the source changes (old image without the new packages); fixed by rebuilding.
+
+## Prompt #35: "its not working test onece again" (bug fix)
+
+- **Date/time:** 2026-10-24, about 23:00–23:15 IST
+- **AI tool:** Claude
+- **Checked:** backend, worker and Redis were healthy, and the database had **no** uploads from the app, so the request never left the device.
+- **Reproduced on the emulator:** Profile → Replace resume → PDF → "Couldn't reach the server".
+- **Root cause (my mistake in Prompt #34):** Expo SDK 58 replaces the global `fetch` with `expo/fetch`, whose FormData does not support React Native's `{ uri, name, type }` file parts. The upload threw before any request was sent. The unit tests run in Node, so they could not catch it, and the Prompt #34 live test used Node fetch, not the app.
+- **Fix:**
+  - `resumeService.submitResume` appends an expo-file-system `File` (a Blob), which `expo/fetch` supports.
+  - Also found: an upload whose queue job was lost (the API restarted between saving it and queueing it) stayed `queued` forever. Retry on a `queued` job now re-adds the same queue job id (a no-op if it exists), and the worker re-queues uploads stuck for more than 5 minutes (every 5 minutes). Tests added; backend 91/91.
+  - The staged copy keeps its real file name in its own folder, so the upload's file name is right.
+  - The backend decodes percent-encoded file names (expo/fetch encodes them) before cleaning them; tests added.
+- **Verified on the emulator:**
+  - upload → processing → ProfileConfirm pre-filled by real Gemini (name, email, phone, role, location, 6 y 4 m);
+  - save → Profile card shows "Asha_Resume.pdf" / PDF;
+  - Download → share sheet with the file;
+  - server: the record is confirmed.
+- **Tests:** backend 91/91, frontend 33/33.

@@ -6,6 +6,8 @@
 const PREFIX = 'spire';
 
 export const GUEST_DATA_KEY = `${PREFIX}:guest:data:v1`;
+// Random id identifying this guest's uploads to the backend (storage/guestSession.js).
+export const GUEST_SESSION_KEY = `${PREFIX}:guest:session:v1`;
 
 // Account-scoped key, e.g. accountKey('u123', 'profile') → 'spire:account:u123:profile'.
 // Prepared for the auth phase; nothing writes account keys yet.

@@ -33,9 +33,16 @@ const profileSlice = createSlice({
     storageStatus: 'loading',
   },
   reducers: {
-    resumeSelected(state, action) {
-      state.resume = action.payload;
+    // The user confirmed the profile extracted from a newly processed resume:
+    // profile and resume change together (one save), never separately.
+    profileConfirmed(state, action) {
+      state.profile = action.payload.profile;
+      state.resume = action.payload.resume;
       state.resumeFileMissing = false;
+    },
+    // The server no longer has the confirmed resume file.
+    resumeFileMissingDetected(state) {
+      state.resumeFileMissing = true;
     },
     guestDataRestored(state, action) {
       const { profile, resume, resumeFileMissing, storageStatus } = action.payload;
@@ -94,18 +101,17 @@ const profileSlice = createSlice({
 });
 
 export const {
-  resumeSelected,
+  profileConfirmed,
+  resumeFileMissingDetected,
   guestDataRestored,
   profileSaved,
   profileEntrySaved,
   profileEntryRemoved,
 } = profileSlice.actions;
 
-// Saves the confirmed profile and immediately asks for matching jobs.
-export const saveProfile = (profile) => (dispatch) => {
-  dispatch(profileSaved(profile));
-  return dispatch(loadRecommendations(profile));
-};
+// Saves the profile. (Job recommendations are not part of this phase, so
+// saving no longer requests them.)
+export const saveProfile = (profile) => (dispatch) => dispatch(profileSaved(profile));
 
 export const selectResume = (state) => state.profile.resume;
 export const selectProfile = (state) => state.profile.profile;

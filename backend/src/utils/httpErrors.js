@@ -28,3 +28,14 @@ export class ServiceUnavailableError extends Error {
     this.status = 503;
   }
 }
+
+// Any other error response with a stable machine-readable `code`, e.g.
+// new HttpError(415, 'unsupported_type', 'Upload a PDF or DOCX file.').
+export class HttpError extends Error {
+  constructor(status, code, message) {
+    super(message);
+    this.name = 'HttpError';
+    this.status = status;
+    this.code = code;
+  }
+}

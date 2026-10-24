@@ -86,6 +86,11 @@ The core assessment requirements come first. Other features must not break them.
   - **Frontend:** All Jobs uses the API (no mock fallback): map viewport events, server clusters, infinite scroll, details by id, and map/list shimmer.
   - **Tests:** backend 55, frontend 20.
 
+- [x] **Phase 1: resume upload → profile** (Prompt #34):
+  - **Backend:** upload API, GridFS storage, BullMQ worker, PDF/DOCX text extraction, Gemini (`GEMINI_MODEL`), status / retry / confirm / download, cleanup.
+  - **App:** real processing screen, confirm-before-replace, guest session id, resume download.
+  - **Tests:** backend 90, frontend 33.
+
 ### In progress
 - [ ] Review of the All Jobs API integration (Prompt #29)
 - [ ] Review of the Docker + Redis setup (Prompts #26–#27)
