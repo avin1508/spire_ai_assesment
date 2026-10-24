@@ -40,11 +40,13 @@ export default function JobDetailsScreen({ navigation, route }) {
       ? promptSignUp()
       : navigation.navigate('Main', { screen: 'Learning', params: { skill } });
 
+  // Applying always requires an account: guests get the login sheet.
   const apply = async () => {
     if (isGuest) {
       promptSignUp();
       return;
     }
+    if (!job.applyUrl) return;
     try {
       await Linking.openURL(job.applyUrl);
     } catch {
@@ -210,7 +212,9 @@ export default function JobDetailsScreen({ navigation, route }) {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-        {job.applyUrl ? (
+        {/* Guests always see the locked Apply button (→ login); signed-in users
+            see "not available" only when the job has no application link. */}
+        {isGuest || job.applyUrl ? (
           <Pressable
             onPress={apply}
             accessibilityRole="link"

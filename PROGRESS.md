@@ -1,7 +1,7 @@
 # Progress
 
 **Current phase:** Phase 2: UI development — Recommended jobs UI and resume-to-recommendations flow (waiting for review)
-**Current prompt:** #15
+**Current prompt:** #17
 **Last updated:** 2026-10-24
 
 ## Locked feature scope

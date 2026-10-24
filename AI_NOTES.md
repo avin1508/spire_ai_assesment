@@ -1831,3 +1831,40 @@ Report:
 - The first test tapped the backdrop's "Close" label, whose centre sits under the sheet, so nothing closed. Fixed in the test by tapping the ✕ button.
 - The Profile "Settings" test first hit Expo Go's floating dev-tools button, which covers the same corner. Fixed by relaunching with `__expo_disable_fab=1`. It's Expo Go's own button, not app UI.
 - The benefit text ran slightly under the illustration. Widened the text column's right margin.
+
+---
+
+## Prompt #16: Whole-project review and backend plan (analysis only)
+
+- **Date/time:** 2026-10-24, about 14:00 IST
+- **AI tool:** Claude
+- **Objective:** Review the codebase, separate what's implemented from what's mock, map the work to the assessment, and propose a backend architecture and build order. No files were changed.
+- **Exact prompt:** the long "Task: Review the Entire iExchange Clone Project and Prepare for Backend Development" message (analysis and planning only; do not modify files).
+- **Result:** delivered in chat:
+  - Proposed stack: Express + Mongoose, Google ID-token verification on the server plus our own JWT, and multer for resumes.
+  - Collections: users, jobs, savedjobs, applications.
+  - Roadmap: phase 0 setup → jobs API → auth → profile → resume → saved/applied → rule-based recommendations.
+  - Open questions: Google needs a development build, Atlas or local MongoDB, unifying the two job formats, a profile skills field, recommendations for guests.
+  - Gaps found in the code: two different job data formats; no skills field on the profile; the Recommended tab title set in two places; All Jobs listings have no apply link or skill data; Saved and Applied are placeholders.
+
+---
+
+## Prompt #17: Guests can't apply — require login on Apply
+
+- **Date/time:** 2026-10-24, about 14:10 IST
+- **AI tool:** Claude
+- **Exact prompt:**
+
+````
+one correction need to if the user will not login na so he can not apply ok add tha logi also on the apply button did you get
+````
+
+- **Finding:** Apply was already gated for guests on jobs with an `applyUrl`. But jobs with no URL (all 120 All Jobs listings, and Recommended rec-4) showed a disabled "Application link not available" bar, so a guest got no login prompt.
+- **Change (`src/screens/JobDetailsScreen.js`):**
+  - Guests now always see the locked "Apply on company site" button, which opens the shared Guest Mode login sheet (intent: return to this job).
+  - Only signed-in users see "Application link not available" when there's no URL.
+  - `apply()` also returns early if there's no URL.
+- **Verification:**
+  - Android export built.
+  - Emulator, as a guest: All Jobs → View jobs (120) → "React Native Developer at Northwind Tech" → Apply showed the locked button → tapping it opened the GUEST MODE sheet with Continue with Google. No errors.
+- **AI mistakes:** none in this change. The original gap came from Prompt #11's design, where the missing-URL case was checked before the guest case.
