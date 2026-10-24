@@ -227,3 +227,1737 @@ No dependencies were added and no code was changed. The setup from Prompt #1 was
 
 ### AI mistake and fix
 - None observed in this prompt.
+
+---
+
+## Prompt #3: Navigation, reusable components, Opportunities screen UI
+
+- **Date/time:** 2026-10-24, about 00:58–01:17 IST
+- **AI tool:** Claude
+- **Objective:** Set up React Navigation with main bottom tabs (Jobs, Skills, Learning, Profile) and nested Jobs tabs (Recommended, All Jobs, Saved, Applied). Build reusable UI components and the Opportunities (All Jobs) screen using only local mock data. No backend, auth, AI, or real map.
+
+### Exact prompt
+
+````
+Implement Prompt #3 for the existing `spire_ai` project. This task covers navigation setup, reusable UI components, and the initial Opportunities / Jobs Home screen only.
+
+Before coding, inspect `frontend/`, `AI_NOTES.md`, `PROGRESS.md`, and `README.md`. Follow the existing project structure and preserve unrelated files.
+
+## 1. Locked requirements
+
+- React Native + Expo.
+- JavaScript only: no TypeScript, `.ts`, or `.tsx`.
+- Use React Navigation, not Expo Router.
+- Use the existing Expo SDK-compatible package versions.
+- Do not implement backend integration or business logic in this task.
+
+## 2. Install and configure navigation
+
+Set up React Navigation with the necessary Expo-compatible dependencies.
+
+Create the main bottom-tab navigation:
+- Jobs
+- Skills
+- Learning
+- Profile
+
+Inside Jobs, create a nested tab bar:
+- Recommended
+- All Jobs
+- Saved
+- Applied
+
+Use placeholder screens for tabs that are not implemented yet. Keep navigation functional, with the Jobs tab opening the Opportunities screen by default.
+
+## 3. Build reusable UI components
+
+Create reusable components with sensible separation of responsibilities:
+
+- `AppHeader` — Opportunities title, Upload Resume button, Share icon, Notification bell.
+- `JobsTabBar` — Recommended, All Jobs, Saved, Applied.
+- `LocationSearchBar` — location icon, search input, list/map toggle.
+- `FilterChip` — reusable filter chip.
+- `MapControls` — zoom and current-location visual controls.
+- `AgentSigmaButton` — floating AI assistant button.
+- `BottomActionBar` — View Companies and View Jobs controls.
+- `BottomTabBar` — main app navigation if a custom tab bar is necessary.
+
+Do not duplicate navigation bars or create unnecessary abstractions. Reuse React Navigation's tab bar where appropriate.
+
+## 4. Opportunities screen UI
+
+Use the attached reference screenshot as the primary visual reference. Match its layout, proportions, spacing, colors, and component placement as closely as practical.
+
+The screen should include:
+- Header with Opportunities, Upload Resume, Share, and notification icons.
+- Horizontal job tabs.
+- Large map-style background covering most of the screen.
+- Sample Indian city labels and blue job/company markers.
+- Location search and list/map toggle.
+- Filter chips: Recommended, Verified, Last 24 hours.
+- Zoom-in, zoom-out, and current-location controls.
+- Floating Agent Sigma button at the lower-right.
+- View Companies and View Jobs action buttons.
+- Bottom navigation: Jobs, Skills, Learning, Profile.
+
+Use a suitable static map-style visual or a locally generated placeholder asset. Do not copy Google Maps branding, watermark, or protected screenshot assets. Do not integrate a real map provider yet.
+
+Use local mock data for markers and counts. Do not call APIs or connect to a database.
+
+## 5. Visual and code quality
+
+- Keep the layout mobile-first and responsive.
+- Handle safe areas and Android navigation/status bars correctly.
+- Use consistent colors, spacing, and typography.
+- Ensure touch targets are usable.
+- Keep component styles organized.
+- Avoid adding dependencies that are not needed.
+- All source code must remain JavaScript.
+
+## 6. Explicitly out of scope
+
+Do not implement:
+- Backend APIs or MongoDB.
+- Authentication logic.
+- Resume upload/parsing.
+- Gemini integration.
+- Saved/applied persistence.
+- Real map integration or location permissions.
+- FCM or background processing.
+- Full Skills, Learning, Profile, or Job Details screens.
+
+Only create functional navigation and the initial Jobs / Opportunities screen; other destinations can show simple placeholders.
+
+## 7. Required tracking and verification
+
+After implementation:
+1. Run appropriate lint or static checks available in the project.
+2. Start Expo and verify the Android JavaScript bundle builds if possible.
+3. Fix issues introduced by this task.
+4. Update `AI_NOTES.md` with this exact prompt, objective, files changed, and actual verification results.
+5. Update `PROGRESS.md` accurately.
+6. Update `README.md` if dependencies or run instructions change.
+7. Check Git status before suggesting any commit. Do not commit automatically.
+8. Report files changed, dependencies added, commands run, verification results, and anything still pending.
+
+Do not start the next feature after finishing this task. Stop and wait for review.
+````
+
+### Key decisions
+- **No reference screenshot was actually attached** to the prompt, so the layout follows the written spec.
+- The nested Jobs tabs reuse `createBottomTabNavigator` with `tabBarPosition: 'top'` and a custom `JobsTabBar`. This avoids adding `@react-navigation/material-top-tabs` and `react-native-pager-view`.
+- The main tabs use React Navigation's built-in tab bar, which handles the bottom safe area. No custom `BottomTabBar` was needed, so none was created.
+- Placeholder tabs share one `PlaceholderScreen`, which gets its title, icon and message from `initialParams`.
+- The map is drawn with plain `View`s (water, parks, highways between cities, labels, pins). No image asset, SVG library, or map provider is used.
+
+### Dependencies added (all via `npx expo install`, SDK 58 compatible)
+- `@react-navigation/native` ^7.5.1
+- `@react-navigation/bottom-tabs` ^7.21.0
+- `react-native-screens` ~4.30.0
+- `react-native-safe-area-context` ~5.10.1
+- `@expo/vector-icons` ^15.0.2
+- `expo-font` ~58.0.9 (required peer of `@expo/vector-icons`; `expo install` also added it to `app.json` `plugins`)
+
+### Files created or modified
+- Modified: `frontend/App.js`, `frontend/app.json` (expo-font plugin), `frontend/package.json`, `frontend/package-lock.json`
+- Created: `frontend/src/theme.js`, `frontend/src/data/mockMap.js`
+- Created: `frontend/src/navigation/RootNavigator.js`, `frontend/src/navigation/JobsNavigator.js`
+- Created: `frontend/src/screens/OpportunitiesScreen.js`, `frontend/src/screens/PlaceholderScreen.js`
+- Created: `frontend/src/components/AppHeader.js`, `JobsTabBar.js`, `LocationSearchBar.js`, `FilterChip.js`, `MapPlaceholder.js`, `MapControls.js`, `AgentSigmaButton.js`, `BottomActionBar.js`
+- Updated: `README.md`, `PROGRESS.md`, `AI_NOTES.md`
+
+### Commands run
+```bash
+npx expo install @react-navigation/native @react-navigation/bottom-tabs react-native-screens react-native-safe-area-context
+npx expo install @expo/vector-icons
+npx expo install expo-font
+npx expo-doctor
+npx expo export --platform android --output-dir <scratch dir outside the repo>
+emulator -avd Pixel_5
+CI=1 npx expo start --android --port 8081
+adb exec-out screencap -p   # screenshots; adb shell input tap   # tab and toggle taps
+```
+
+### Verification and results
+- Checked every Ionicons name used against the installed glyph map: all exist.
+- `npx expo-doctor`: **failed at first** (missing peer dependency `expo-font`). After `npx expo install expo-font`, it passed **20/20**.
+- `npx expo export --platform android`: passed and produced a Hermes bundle.
+- Android emulator (Pixel_5, Expo Go installed by `expo start --android`): the app loaded with `Android Bundled ... index.js` and no errors in the Metro log.
+  - Screenshots confirmed the header, nested tabs (All Jobs active by default), search bar and toggle, chips, map with city labels and markers, zoom and locate controls, Agent Sigma, action buttons, and bottom tabs.
+  - Tapping the list toggle showed the list placeholder. Tapping Saved showed the Saved placeholder. Tapping Skills showed the Skills placeholder with its header. Tapping Jobs returned to Jobs with the Saved sub-tab still selected.
+- No `.ts`/`.tsx` files exist outside `node_modules`.
+- **Not done:** linting (the project has no ESLint config), iOS, and a physical device.
+
+### AI mistakes and fixes
+1. **Blank map caused by an unverified API assumption.**
+   - **Mistake:** Claude styled the map container with `...StyleSheet.absoluteFillObject`. The first emulator screenshot showed an empty map: no water, roads, cities or markers.
+   - **Why it was wrong:** In the installed React Native 0.88, that spread didn't apply absolute positioning. The container got zero height, and `overflow: 'hidden'` clipped everything inside it. Claude had used the API from memory without checking the installed version.
+   - **Fix:** Replaced it with explicit `position: 'absolute', top/left/right/bottom: 0`. The next screenshot showed the map correctly.
+2. **Missing peer dependency.** Claude installed `@expo/vector-icons` without its required native peer `expo-font`. `expo-doctor` caught this ("Your app may crash outside of Expo Go"). Fixed with `npx expo install expo-font`.
+3. **Layout overlaps (found from screenshots).** The search bar ran edge to edge with no margin, the top markers sat under the filter chips, and some pins covered the city labels (New Delhi, Mumbai, Kolkata). Fixed by adding horizontal padding around the search bar and moving the mock coordinates into the clear part of the map.
+
+---
+
+## Prompt #4: Restyle the Opportunities UI to match the reference screenshot
+
+- **Date/time:** 2026-10-24, about 01:20–01:28 IST
+- **AI tool:** Claude
+- **Objective:** Restyle the Prompt #3 UI to closely match a reference screenshot of the iExchange Opportunities screen, which the user attached to this prompt. Behaviour and scope stay the same: UI only, mock data.
+
+### Exact prompt
+
+````
+every thing is fine but there is one problem bro and that is ui i need similar to this did you n you do
+````
+
+(The prompt had a screenshot attached showing the reference Opportunities screen.)
+
+### What changed (restyle only; no new features or dependencies)
+- **Header:** "Upload Resume" is now an outlined pill. The share icon is blue and the bell is a grey outline.
+- **Jobs tabs:** the bar scrolls horizontally, and the labels show counts ("Recommended (0)", "Saved (0)", "Applied (0)"). It auto-scrolls only when the active tab is partly hidden.
+- **Search:** a pill-shaped "Search Location" field, with the list/map toggle in its own pill. The active mode is a filled blue circle.
+- **Filters:** an icon-only filter button, a "Recommended" chip with a gold sparkle, and "Verified" and "Last 24 hours" chips with blue dots.
+- **Map illustration:**
+  - mint land with lighter patches, a sea on the east and west
+  - thin grey roads and dashed state borders
+  - uppercase state labels and a bold "India" label, with hollow-dot city labels
+  - teardrop job pins and white company callouts (briefcase, count, and a blue company name)
+  - It's still drawn with plain Views: no map provider, no copied map tiles or branding.
+- **Map controls:** zoom +/− in one card, and a blue locate icon in a separate card.
+- **Agent Sigma:** a blue circle with a light halo.
+- **Action buttons:** centred white pills for "View companies" and "View jobs (N)".
+- **Bottom tab icons:** a puzzle piece for Skills and a book for Learning.
+- **Mock data:** reworked in `mockMap.js`. It now has region labels, roads, state borders, land patches, company markers and tab counts. Positions are estimated from the reference screenshot.
+- **Note on the mock data:** the company names ("Kotak Mahindra", "Accenture") and the job count (186445) were copied from the reference screenshot. They are mock values only.
+
+### Files modified
+- `frontend/src/theme.js`, `frontend/src/data/mockMap.js`
+- `frontend/src/components/AppHeader.js`, `JobsTabBar.js`, `LocationSearchBar.js`, `FilterChip.js`, `MapPlaceholder.js`, `MapControls.js`, `AgentSigmaButton.js`, `BottomActionBar.js`
+- `frontend/src/screens/OpportunitiesScreen.js`
+- `frontend/src/navigation/JobsNavigator.js`, `frontend/src/navigation/RootNavigator.js`
+- `AI_NOTES.md`, `PROGRESS.md`, `README.md`
+
+### Verification and results
+- Checked every new Ionicons name against the installed glyph map: all exist.
+- `CI=1 npx expo start --android` on the Pixel_5 emulator: `Android Bundled ... (1052 modules)`, with no errors in the Metro log.
+- Compared emulator screenshots with the reference: the layout, shapes, colours and positions match closely.
+- Tapped the Applied tab: the tab bar scrolled to show it, and the Applied placeholder opened.
+- **Not re-run:** `expo-doctor` (no dependency changes since it last passed 20/20). Also not tested on iOS or a physical device.
+
+### AI mistakes and fixes
+1. **The first restyle had a tab-bar scroll bug.** The auto-scroll always scrolled to the active tab, so on first load "Recommended" was cut off on the left. The reference starts unscrolled. Fixed by scrolling only when the active tab is partly outside the visible area.
+2. **The first restyle had overlaps** (found from a screenshot). The action buttons hid the Bengaluru label and the Accenture callout, and "CHHATTISGARH" collided with the Kotak callout and the map controls. Fixed by raising the action bar to 9% from the bottom, moving the southern cities and labels up, and moving the CHHATTISGARH label.
+3. **Shell edit escaping.** A `sed` substitution for the `ANDHRA\nPRADESH` label didn't match because of backslash escaping. The `grep` output caught it, and Claude fixed it with a direct file edit.
+
+---
+
+## Prompt #5: Swipe navigation between the Jobs tabs
+
+- **Date/time:** 2026-10-24, about 01:33–01:38 IST
+- **AI tool:** Claude
+- **Objective:** Let users swipe horizontally between Recommended, All Jobs, Saved and Applied, while tapping the labels still works. The UI, the tab bar and the other screens must stay exactly the same.
+
+### Exact prompt
+
+````
+I have an existing React Native Expo app with a Jobs screen. At the top of the screen, I have horizontal tabs:
+
+- Recommended
+- All Jobs
+- Saved
+- Applied
+
+Currently, users can switch between these tabs only by tapping on the tab labels. I want to add **horizontal swipe gesture navigation**, similar to native mobile apps.
+
+### Required behavior
+
+1. When the user swipes from right to left, navigate to the next tab.
+   - Recommended → All Jobs
+   - All Jobs → Saved
+   - Saved → Applied
+
+2. When the user swipes from left to right, navigate to the previous tab.
+
+3. Tapping on any tab label should continue to work as it does currently.
+
+4. The active tab indicator, tab label styling, and displayed content must stay synchronized with the selected tab.
+
+5. The content should slide smoothly during swipe gestures, providing a native mobile app experience.
+
+### Important constraints
+
+- **Do not redesign or modify the existing UI.** Keep the current header, tab labels, active indicator, spacing, colors, map, filters, job markers, and bottom navigation exactly as they are.
+- Integrate swipe functionality into the existing implementation instead of rebuilding the screen.
+- Preserve all existing tab-specific logic, API calls, filters, saved jobs, applied jobs, and state management.
+- Avoid conflicts between horizontal tab swipes and the map's own gestures. Swiping the map should continue to work normally.
+- Use a solution compatible with my existing Expo and React Native versions. Prefer `react-native-tab-view` with `react-native-pager-view` if suitable, but first inspect the existing project and dependencies. Reuse existing libraries where possible.
+- Do not introduce unnecessary dependencies or refactor unrelated components.
+
+### Before making changes
+
+Inspect the current Jobs screen, its tab implementation, package.json, and relevant components. Identify the smallest safe change needed to add swipe navigation.
+
+Then implement the changes directly in the existing codebase and explain which files you modified.
+
+**Expected result:** The tabs should work both by tapping their labels and by swiping horizontally across the tab content, without changing the current UI or breaking existing functionality.
+````
+
+### Approach
+- The Jobs sub-tabs used `createBottomTabNavigator` with `tabBarPosition: 'top'` and a custom `tabBar`. That navigator has no swipe support.
+- The smallest change was to swap it for `createMaterialTopTabNavigator`, which is built on `react-native-tab-view` and `react-native-pager-view`. It passes the same `state`, `descriptors` and `navigation` props to a custom `tabBar`. Because of that, `JobsTabBar`, the screens, the routes and the tab options stay unchanged.
+- The bottom-tabs-only options (`headerShown`, `tabBarPosition`) were removed and `swipeEnabled: true` was set.
+
+### Dependencies added (via `npx expo install`, SDK 58 compatible)
+- `@react-navigation/material-top-tabs` ^7.8.1
+- `react-native-tab-view` ^4.3.4
+- `react-native-pager-view` 9.0.7
+
+### Files modified
+- `frontend/src/navigation/JobsNavigator.js`: navigator import, constructor, and `screenOptions`.
+- `frontend/package.json`, `frontend/package-lock.json`: the new dependencies.
+- `AI_NOTES.md`, `PROGRESS.md`, `README.md`.
+
+### Verification and results
+- `npx expo-doctor`: passed **20/20**.
+- `CI=1 npx expo start --android` on the Pixel_5 emulator: `Android Bundled ... (1070 modules)`, with no errors or warnings in the Metro log.
+- Swipe tests using `adb shell input swipe`, with screenshots:
+  - Right to left from All Jobs: went to Saved, then to Applied.
+  - Left to right from Applied, three times: went back to Saved, then All Jobs, then Recommended.
+  - Each time, the label colour and the underline moved to the active tab, and the tab bar scrolled the active label into view.
+- Tapping the All Jobs label switched tabs, as before.
+- Swiping horizontally on the filter-chip row scrolled the chips and stayed on All Jobs (the nested horizontal scroll takes priority).
+- The UI looked the same in screenshots as it did before the change.
+- **Not verified:**
+  - iOS and a physical device.
+  - Whether the tab indicator follows the finger during a drag: the custom tab bar updates when the swipe finishes, and screenshots can't show the in-between frames.
+
+### Known trade-off: map gestures
+- The map is currently a static illustration with no pan or zoom gestures, so there is no conflict yet. Swiping across the map area changes tabs, which is the required All Jobs → Saved behaviour.
+- When a real interactive map is added, its pan gestures will compete with the pager. The planned fix is to set `options={{ swipeEnabled: false }}` on the `AllJobs` screen (tab taps still work), or to limit swiping to non-map areas. That decision is deferred to the real-map task.
+
+### AI mistakes and fixes
+- None observed in this prompt.
+
+---
+
+## Prompt #6: Visual check of the running app against the user's phone screenshots
+
+- **Date/time:** 2026-10-24, about 02:08–02:14 IST
+- **AI tool:** Claude
+- **Objective:** Run the app, open the Jobs / Opportunities screen, compare it with 4 reference screenshots (taken by the user in Expo Go on their phone: All Jobs, Recommended, Saved, Applied), and fix only the differences that can be verified.
+
+### Exact prompt
+
+````
+Run my existing React Native Expo project and visually verify the Jobs / Opportunities screen against the 4 reference screenshots I provided.
+
+Follow these steps:
+
+1. Inspect the project and identify the correct Expo start command.
+2. Check whether dependencies and the required environment are available.
+3. Start the Expo development server.
+4. If an Android emulator is available, launch the app on it. Otherwise, check whether another available preview method can be used.
+5. Navigate to the Jobs / Opportunities screen and compare it against all 4 reference screenshots.
+6. Identify actual visual differences in the header, tabs, empty states, map screen, and bottom navigation.
+7. Fix only the differences you can verify. Do not make unrelated changes.
+8. Run the available checks and report any errors.
+
+Important:
+- Do not claim the app was visually tested unless you actually opened and inspected the running app.
+- If no emulator or visual preview is available, tell me exactly what is missing and how I can provide access.
+- Do not replace the existing map with a static image.
+- Preserve existing functionality and project architecture.
+
+At the end, report the command used, whether the app launched successfully, what you visually verified, which files you changed, and any remaining issues.
+````
+
+(The 4 screenshots were sent while the task was running.)
+
+### Commands run
+```bash
+npx expo-doctor                         # 20/20 passed
+CI=1 npx expo start --android --port 8081   # same as `npm run android`, non-interactive
+adb exec-out screencap -p / adb shell input tap|swipe / adb shell uiautomator dump
+```
+
+### Verification and results
+- The app launched in Expo Go on the Pixel_5 emulator: `Android Bundled ... index.js`, with no errors or warnings in the Metro log.
+- Compared the emulator screenshots with all 4 reference screenshots:
+  - **Header, tabs, bottom navigation:** match (title, outlined Upload Resume, blue share icon, grey bell; tab labels with counts and the blue underline; the active tab scrolls into view on Applied; Jobs/Skills/Learning/Profile icons and colours).
+  - **Empty states (Recommended, Saved, Applied):** match (icon circle, title and message text).
+  - **All Jobs map:** matches. The phone screenshot showed the Recommended and Verified chips in their selected state. After selecting the same chips on the emulator, the style was identical.
+- The only difference was the grey/blue **gear button** in the phone screenshots. It is Expo Go's floating developer-tools button, not app UI. On the emulator it is hidden because `expo start --android` opens the app with `__expo_disable_fab=1`. It can't be fixed in app code.
+- **Code changes:** none. No differences in the app itself were found.
+
+### AI mistakes and fixes
+- **A false bug lead from batched input.** Claude sent several `adb` taps back-to-back and took one screenshot at the end. The screenshots showed the wrong tab (Saved, then Skills, then Profile), which looked like a tab-tap bug. Claude re-tested with one tap and one screenshot at a time, after waiting for the transition to finish. Tapping worked correctly every time, and the earlier chip taps had actually registered. Lesson: do one action per screenshot and wait for animations to finish before deciding something is a bug.
+- An `adb pull /sdcard/...` command failed because Git Bash rewrote the device path. Fixed with `MSYS_NO_PATHCONV=1`.
+
+---
+
+## Prompt #7: Recommended Jobs UI and resume-to-recommendations flow
+
+- **Date/time:** 2026-10-24, about 02:47–03:20 IST
+- **AI tool:** Claude
+- **Objective:** Build the Recommended tab states and the guest → resume → profile → recommendations journey from the reference screenshots. Use the user's illustration (`frontend/assets/recommended-jobs-hero.png`), and add honest pending/unavailable states instead of fake AI results.
+
+### Exact prompt
+
+````
+# Prompt #7 — Implement Recommended Jobs UI and Resume-to-Recommendations Flow
+
+We are continuing Phase 2: UI Development of our existing React Native Expo **JavaScript-only** project.
+
+I will provide 6 reference screenshots showing the intended user journey. I have also added a custom male professional illustration to the project's assets folder. Inspect the project to find its exact path and reuse that asset.
+
+**First study all 6 screenshots in order. Treat them as the source of truth for the intended UI and flow.** Then inspect `AI_NOTES.md`, `PROGRESS.md`, the existing navigation, and the current Jobs / Opportunities implementation before making changes.
+
+## 1. Required user journey
+
+### State 1 — Guest without a resume
+
+When the user is in guest mode and has not uploaded a resume or provided profile data, the Recommended tab should show the promotional landing screen from reference screenshot 1.
+
+Include:
+- The existing Opportunities header and job tabs.
+- The Recommended Jobs badge.
+- The headline and explanatory text from the screenshot.
+- The custom male professional illustration from the project's assets folder.
+- The illustrative job cards shown in the reference, treated as decorative examples rather than real recommendations.
+- A prominent Upload Resume button.
+- A Sign Up to Explore More action.
+
+Do not show fabricated live recommendations in this state.
+
+### State 2 — Resume selected and uploaded
+
+When the guest selects a resume, follow the existing upload flow and display the resume file confirmation screen shown in reference screenshot 2.
+
+The confirmation screen must:
+- Show the selected file's name and size when available.
+- Ask whether this is the correct resume.
+- Provide a confirmation action and a way to select a different file.
+
+This confirmation screen must be reusable whenever the user uploads or updates their resume, including after signing in.
+
+### State 3 — AI profile processing
+
+After the user confirms the resume, show the processing UI from reference screenshot 2.
+
+Display the progress indicator, `Building Your Profile` heading, explanatory text, and processing steps for:
+- Analyzing experience and education.
+- Mapping skills and expertise levels.
+- Creating the skills profile.
+
+Do not claim that real AI processing has completed unless an actual result is available.
+
+### State 4 — Extracted profile confirmation
+
+After profile extraction, show the editable profile confirmation form from reference screenshot 3.
+
+Include the fields and layout visible in the screenshot, such as name, email, phone, current role, current location, preferred work locations, total experience, and current company.
+
+Use extracted values when available. Keep editable fields editable and validate required fields. Do not hardcode my personal details or assume every user has the same profile.
+
+The user should be able to confirm the profile using the action shown in the screenshot.
+
+### State 5 — Recommendations being generated
+
+After profile confirmation, display the recommendation-loading state shown in reference screenshot 4.
+
+Preserve the existing Opportunities header, tabs, search/filter area, bottom navigation, and the Agent Sigma empty/loading illustration where applicable.
+
+While recommendations are pending, show an honest loading or waiting state. Do not display fabricated recommendation counts or pretend the AI has finished.
+
+### State 6 — Recommendations available for a guest
+
+When actual recommendation results become available, display the job-list UI from reference screenshot 5.
+
+Job cards should follow the reference design, including:
+- Job title and company.
+- Verification badge when the underlying data supports it.
+- Location and posting age.
+- Match label and matched skills.
+- Missing-skill/gap information when available.
+- Share and save actions.
+- A Sign Up CTA for guest users where appropriate.
+
+Do not hardcode the sample jobs in the screenshot as actual recommendations. Use existing data if available; otherwise create the reusable UI structure and a clear empty state.
+
+### State 7 — Recommendations available for a logged-in user
+
+Display the authenticated version shown in reference screenshot 6.
+
+Preserve the relevant differences visible in the screenshot, including the header actions and job-card behavior. Reuse the same job-card components wherever possible instead of duplicating the entire screen.
+
+Guest and authenticated states must be driven by the project's actual authentication/session state, not by manually toggling hardcoded UI flags.
+
+## 2. Learning action for missing skills
+
+The Learning action is relevant when a recommended job requires a skill that is missing from the user's profile.
+
+- Show skill-gap information only when supported by the job and profile data.
+- Provide a Learning entry point for relevant missing skills.
+- Do not show the Learning action as a universal requirement for every job.
+- Preserve the existing bottom navigation and Learning tab.
+
+Do not implement the full Learning module in this prompt. Only preserve or prepare the relevant UI entry point.
+
+## 3. Implementation boundaries
+
+1. Reuse the existing Expo architecture, navigation, theme, and components.
+2. Use the custom male illustration already present in the assets folder. Do not generate or substitute another image.
+3. Keep the project JavaScript-only; do not introduce TypeScript.
+4. Reuse the existing resume picker/upload implementation if one exists.
+5. Reuse the resume confirmation screen for initial uploads and later resume updates.
+6. Keep guest and logged-in experiences separate where the reference screenshots require them.
+7. Do not invent backend endpoints, database schemas, Gemini responses, or recommendation data.
+8. Do not implement backend, MongoDB, Gemini integration, FCM, or BullMQ in this prompt.
+9. Do not rebuild or unnecessarily change the already verified All Jobs, Saved, and Applied screens.
+10. Keep the existing map implementation intact.
+11. Avoid unnecessary dependencies and unrelated refactoring.
+
+## 4. Execution and verification
+
+Before editing:
+- Inspect the six reference screenshots in the order supplied.
+- Inspect the existing project and determine which parts of this flow are already implemented.
+- Identify reusable screens and components so that existing work is not duplicated.
+
+Then:
+- Implement only the UI states and transitions that belong to this prompt.
+- Reuse existing working functionality wherever possible.
+- Run the app on the Android emulator.
+- Visually inspect the relevant states against the screenshots.
+- Test the available navigation and resume-flow transitions.
+- Run the available project checks.
+- Update `AI_NOTES.md` and `PROGRESS.md` with the actual work performed.
+
+If a state depends on backend or AI functionality that does not exist yet, implement only the appropriate UI and honest pending/error states. Clearly report the missing integration instead of simulating successful processing.
+
+## 5. Final report
+
+Report:
+1. What was already implemented before your changes.
+2. Which screens, states, and transitions you implemented or reused.
+3. The exact files changed.
+4. Whether the custom illustration was located and used successfully.
+5. Which flows you actually tested on the emulator.
+6. Which flows still require backend, authentication, resume parsing, or AI integration.
+
+Do not start unrelated screens or the backend phase. Complete this task, verify it, and wait for my next instruction.
+````
+
+(Six images were attached. Two were duplicates, so only 4 distinct references arrived: signed-in job list, guest job list, "Agent Sigma is on the hunt", and the profile form. There were no references for State 1 or States 2–3.)
+
+### Already in place before this prompt
+- The Opportunities header, Jobs tabs (with swipe), All Jobs map, bottom tabs, theme, and the `FilterChip` and `AppHeader` components.
+- The Recommended tab was a placeholder. There was no resume picker, no auth/session, no stack navigator and no job data.
+
+### Approach
+- **Navigation:** a native stack (`AppNavigator`) wraps the existing tabs, so the resume flow opens full-screen without the tab bar.
+- **State:** `SessionContext` holds the user, starts as a guest, and exposes `signIn`/`signOut` for future auth. `ProfileContext` holds the resume, the confirmed profile and the recommendation status.
+- **Services:** `parseResume` and `fetchRecommendations` throw a `ServiceUnavailableError`, so screens show honest "not connected yet" states. No endpoints, data or Gemini output were invented.
+- **Header:** depends on the session and profile. Guest without a profile: Upload Resume + share + bell. Guest with a profile: Sign up + share. Signed in: share + bell.
+- **Recommended tab states:** landing (no profile) → loading → ready (job list) / empty / unavailable / error.
+- **Job cards:** one shared `JobCard` component; the `locked` prop adds the guest lock badges.
+- **Learning:** tapping a gap chip opens the Learning tab when signed in, or prompts guests to sign up. Gaps only show when the job data contains them.
+- **Illustration:** the user's `recommended-jobs-hero.png` is used on the landing and status states. The job cards in it are labelled "Example matches shown for illustration".
+
+### Dependencies added (via `npx expo install`, SDK 58 compatible)
+- `expo-document-picker` ~58.0.4: picks the resume file. No picker existed before.
+- `@react-navigation/native-stack` ^7.21.0: full-screen flow screens.
+
+### Files
+- **New:**
+  - `src/navigation/AppNavigator.js`
+  - `src/screens/RecommendedScreen.js`, `ResumeConfirmScreen.js`, `ProfileProcessingScreen.js`, `ProfileConfirmScreen.js`
+  - `src/components/Button.js`, `JobCard.js`, `SearchField.js`, `RecommendedLanding.js`, `RecommendationStatus.js`
+  - `src/context/SessionContext.js`, `ProfileContext.js`
+  - `src/services/errors.js`, `resumeService.js`, `recommendationService.js`
+  - `src/hooks/useResumeUpload.js`
+  - `src/utils/pickResume.js`, `format.js`
+- **Modified:**
+  - `App.js` (providers + stack)
+  - `src/navigation/JobsNavigator.js` (Recommended screen, live count, header variants)
+  - `src/components/AppHeader.js` (configurable action, optional bell)
+  - `src/components/FilterChip.js` (`outline` variant, `disabled`, `labelColor`)
+  - `src/theme.js` (new colours)
+  - `src/data/mockMap.js` (removed the unused `recommended` mock count)
+  - `package.json`, `package-lock.json`, `README.md`, `PROGRESS.md`, `AI_NOTES.md`
+- **Used, not changed:** `frontend/assets/recommended-jobs-hero.png`, added by the user.
+
+### Verification and results
+- **Checks:** `npx expo-doctor` passed **20/20**. `npx expo export --platform android` built the bundle. No `.ts`/`.tsx` files.
+- **Emulator (Pixel_5, Expo Go), with the real services, which aren't connected:**
+  - Guest landing renders with the illustration, Upload Resume and Sign Up to Explore More.
+  - Upload Resume opens the Android file picker. Cancelling returns to the landing screen unchanged.
+  - Picking a dummy `Test_Resume.pdf` shows "Is this the correct resume?" with "PDF · 193 B".
+  - "Yes, continue" leads to "We couldn't build your profile", with the parser's "not connected" message plus "Fill in details manually" and "Try again".
+  - The form opens empty, with no personal data hardcoded. Submitting it empty shows inline validation errors.
+  - After filling it with test data, "Done" lands on Recommended, which shows "Recommendations aren't ready yet" with Try again. The header switches to Sign up + share.
+  - The header's Upload Resume (on All Jobs) also starts the flow.
+- **Emulator, with a temporary test patch** (a 5–6 s delay plus 3 generic test jobs in the two services, and a test user in `SessionContext`, all restored from backups afterwards; `grep TEMP-` finds 0 markers):
+  - "Building Your Profile" in-progress view with spinner and steps.
+  - "Agent Sigma is on the hunt" loading view.
+  - Guest job list: verified badges, Good Fit, posting age, "+N" matches, gap chips with lock badges. Tapping a locked chip shows the sign-up prompt.
+  - Signed-in run: the form pre-fills name and email from the session. The list has no lock badges, the header shows share + bell, a gap chip opens the Learning tab, overflowing gap rows show a ">" chevron, and a card with no gaps or verification hides those parts.
+- After reverting, the app was relaunched and loaded in the real guest state with no Metro errors.
+- **Not tested:** iOS, a physical device, and real sign-in (none exists yet).
+
+### AI mistakes and fixes
+1. **Illustration rendered enormous.** Claude set `aspectRatio` directly on the `Image`. On the device it was ignored, so the image used its natural height and `cover` zoomed in on the speech bubble. Fixed by putting the size on a wrapping `View` and making the image fill it.
+2. **Missing gap-row chevron.** The overflow check depended on the order of the ScrollView's two measurement events and read the row width as 0. A temporary log confirmed it. Fixed by storing both widths and comparing them.
+3. **Lock badge too small.** It rendered as a blob. Changed to a larger outlined padlock to match the reference.
+4. **A test relaunch opened a different app (process mistake).** Claude reopened Expo Go with a hand-built `am start` deep link. Expo Go loaded another project from its history (a salon app), and three scripted taps landed in that app before the screenshot showed it. Claude force-stopped it immediately and from then on launched only via `expo start --android`, checking the expected text is on screen before every tap. The user was told to check that project for accidental changes.
+5. **Test-script errors (not app bugs):** the keyboard scrolled the form, so typed text landed in the wrong fields. A hardware Back closed the form. Regex-escaping broke text matching. All were fixed in the test script; the app code didn't change.
+
+---
+
+## Prompt #8: Replace React Context with Redux Toolkit
+
+- **Date/time:** 2026-10-24, about 03:20–03:35 IST
+- **AI tool:** Claude
+- **Objective:** Use Redux Toolkit for app state instead of the two React contexts added in Prompt #7. The UI and behaviour stay the same.
+
+### Exact prompt
+
+````
+insted of context we will use the redux toolkit did you get
+````
+
+### Changes
+- **Added** (via `npx expo install`): `@reduxjs/toolkit` ^2.13.0 and `react-redux` ^9.3.0.
+- **New `src/store/`:**
+  - `index.js`: `configureStore`.
+  - `sessionSlice.js`: `user`, the `signedIn` / `signedOut` actions, and the `selectUser` / `selectIsGuest` selectors.
+  - `profileSlice.js`: `resume`, `profile`, `recommendations`, the `resumeSelected` / `profileSaved` actions, the `loadRecommendations` async thunk (`createAsyncThunk`), the `saveProfile` thunk, and selectors.
+- **Removed:** `src/context/SessionContext.js` and `src/context/ProfileContext.js`.
+- **Updated** to use `useSelector` / `useDispatch`: `App.js` (Redux `Provider`), `JobsNavigator.js`, `RecommendedScreen.js`, `ResumeConfirmScreen.js`, `ProfileProcessingScreen.js`, `ProfileConfirmScreen.js`.
+
+### Verification and results
+- `npx expo-doctor`: passed **20/20**. `npx expo export --platform android`: bundle built. No references to the old contexts remain.
+- **Emulator:** landing → Upload Resume → confirmation → "couldn't build your profile" → manual form → Done → "Recommendations aren't ready yet". Try again re-dispatched the `loadRecommendations` thunk and returned to the same state. No Metro errors.
+
+### Issues during testing (not app bugs)
+- The emulator's Android system server crashed mid-test ("Can't find service: input/activity", load average around 48). It recovered after about a minute, and the first app relaunch then hung at "Downloading 99.8%" until Metro was restarted.
+- In one run the app ended up on the Profile tab after a scripted tap made while the app was still loading. The cause couldn't be pinned down: no app code navigates to Profile at that point. It didn't happen again.
+- The test PDF wasn't visible in the picker until a media scan was run.
+
+### AI mistakes and fixes
+- A wait loop in the test script checked for `found`, which also matches `not found`, so it exited early. Fixed by matching `: found`.
+
+---
+
+## Prompt #9: Hardcoded sample recommendations
+
+- **Date/time:** 2026-10-24, about 03:35 IST
+- **AI tool:** Claude
+- **Objective:** Let the user see the recommended-jobs list now, before a backend exists, by hardcoding sample jobs.
+
+### Exact prompt
+
+````
+can i see the recomended job can you hardcode that
+````
+
+### Changes
+- **New `src/data/mockRecommendations.js`:** 5 sample jobs, clearly labelled **MOCK DATA**, with fictional company names (Northwind Tech, Bluepeak Labs, Orbitron Systems, Lumen Retail, Saffron Fintech). The set includes verified and unverified jobs, a job posted within 24 hours, and one with no skill gaps, so every card variant shows.
+- **`src/services/recommendationService.js`:** `fetchRecommendations` now waits 1.5 s, so the loading state is visible, then returns the mock jobs instead of throwing "not connected". It's marked MOCK in the code, so swapping in the real API later only changes this function.
+- **Unchanged:** resume parsing (`parseResume`) still reports "not connected", so profile details are still entered by hand.
+
+### Verification and results
+- **Emulator:** after the resume flow and the profile form, the Recommended tab showed "Agent Sigma is on the hunt" and then **Recommended (5)**. The guest job cards rendered with lock badges, the Good Fit pill, the "+N" match pill and gap chips, including the overflow chevron.
+
+### Note
+- This is demo data, the same for every profile. It is **not** real AI matching, and it must be replaced by the backend recommendations API.
+
+---
+
+## Prompt #10: Sort and All Filters bottom sheets for Recommended jobs
+
+- **Date/time:** 2026-10-24, about 03:45–03:55 IST
+- **AI tool:** Claude
+- **Objective:** Add the Sort sheet and the All Filters sheet (expandable sections, search, multi-select, a "Show N jobs" button), and make the Verified, Last 24 hours and search controls filter the Recommended list. Match the 4 new reference screenshots.
+
+### Exact prompt
+
+````
+We are implementing Phase 2: UI Development in the existing React Native Expo JavaScript project.
+
+I am providing reference screenshots for the Recommended Jobs screen, its filtering bottom sheets, and the complete resume-to-recommendations flow. Study all screenshots before making changes.
+
+The custom male illustration has already been added to the project's assets folder. Find its actual path and reuse it where required.
+
+### 1. Recommended screen states
+
+Implement the following flow in order, reusing existing screens and components wherever possible:
+
+1. **Guest without resume:** Show the promotional Recommended Jobs landing screen with the custom male illustration, Upload Resume button, and Sign Up to Explore More action.
+2. **Resume selected:** Show the selected file's name and size, with confirmation and an option to choose a different file.
+3. **Resume processing:** Show the Building Your Profile loader and its progress steps.
+4. **Profile confirmation:** Show the editable form populated with extracted data when available.
+5. **Recommendations pending:** Show the appropriate loading/empty state while recommendations are being generated.
+6. **Recommendations ready — guest:** Show the recommended job list and the appropriate sign-up action.
+7. **Recommendations ready — authenticated user:** Show the logged-in version of the job list and header.
+
+Reuse the resume confirmation flow whenever the user uploads or updates their resume. Use actual session state for guest versus authenticated experiences.
+
+### 2. Recommended job list UI
+
+Match the supplied reference screenshots, including:
+
+- Opportunities header and horizontally scrollable tabs.
+- Recommended result count when actual data is available.
+- Search bar with placeholder: `Search Recommended Jobs, Skills, Location...`
+- Sort button.
+- All Filters button.
+- Verified filter chip.
+- Last 24 hours filter chip.
+- Scrollable job cards with title, company, verification status when supported, fit label, location, posting age, matched skills, skill gaps, share, and save actions.
+- Existing bottom navigation.
+
+Use the supplied male illustration on the promotional landing state. Do not replace it with another image.
+
+### 3. Sort bottom sheet
+
+When the user taps Sort, show a bottom sheet matching the first new reference screenshot.
+
+Include these options with radio selection:
+
+- Recommended
+- Aging (Newest First)
+- Fitment (Excellent Fit to Weak Fit)
+- Distance (Nearest First)
+
+The selected option should be visually indicated. Apply sorting only when the required data exists. If distance data is unavailable, do not invent distances.
+
+### 4. All Filters bottom sheet
+
+When the user taps All Filters, show the bottom sheet matching the supplied screenshots.
+
+Include expandable filter sections for:
+
+- Country
+- Location
+- Company
+- Experience
+- Job Title
+- Aging
+- State
+
+Each section should show its current selection, defaulting to `Any` when nothing is selected.
+
+When a section expands, show relevant options, selection controls, and a search field where appropriate. The Location section should support searching locations and selecting multiple options. The Company section should support searching companies and selecting multiple options.
+
+Show available result counts only when they come from actual data.
+
+Keep the bottom `Show N jobs` action visible. Update N based on the current filter selections and available dataset. Applying filters must update the displayed job list and result count.
+
+### 5. Filter chip behavior
+
+- **Verified:** Toggle the verified-jobs filter.
+- **Last 24 hours:** Toggle the recent-postings filter.
+- **Sort:** Open the Sort bottom sheet.
+- **All Filters:** Open the All Filters bottom sheet.
+- **Search:** Filter jobs by relevant searchable fields such as job title, skills, and location.
+
+Maintain selected filter states while opening and closing the sheets. Provide an appropriate way to clear or reset selections.
+
+### 6. Implementation constraints
+
+1. Inspect the existing code, navigation, theme, job components, and project notes before editing.
+2. Reuse the existing architecture and working functionality.
+3. Do not rebuild the already verified All Jobs, Saved, or Applied screens.
+4. Do not replace the map with a static image.
+5. Do not add fabricated live jobs, result counts, verification badges, match scores, or location data.
+6. Do not implement backend, MongoDB, Gemini, or recommendation algorithms in this prompt.
+7. If real data is not available, build reusable UI components and clearly report which data-dependent behaviors remain pending.
+8. Do not introduce unnecessary dependencies or TypeScript.
+9. Preserve existing resume upload and authentication behavior.
+10. Avoid unrelated refactoring.
+
+### 7. Testing
+
+Run the Expo app on the Android emulator and inspect the actual running UI.
+
+Verify:
+- The Recommended landing state.
+- The available recommendation list state.
+- Sort bottom sheet and all four options.
+- All Filters bottom sheet and expandable sections.
+- Search and filter interactions using the available dataset.
+- Result counts and selected chips.
+- Navigation to the other existing tabs.
+
+Run available checks and update `AI_NOTES.md` and `PROGRESS.md` with the work actually completed.
+
+### Final report
+
+Report the files changed, functionality implemented, reference comparisons performed, emulator test results, and any remaining backend/data dependencies.
+
+Do not start unrelated screens or backend integration. Finish this task and wait for my next instruction.
+````
+
+(Four screenshots were attached: the Company section, the expanded Location section, the collapsed All Filters sheet and the Sort By sheet.)
+
+### Context
+- The previous message ("cant able to see the recomented jobs bro") wasn't resolved directly. A clarifying question was declined, and this prompt followed. The jobs appear only after the resume flow, ending with Fill in details manually → form → Done.
+
+### Changes
+- **New `src/components/BottomSheet.js`:** a reusable modal sheet with a dimmed backdrop, handle, title, optional header action, optional floating close button and fixed footer. No new dependency.
+- **New `src/components/SortSheet.js`:** radio options for Recommended, Aging (Newest First), Fitment (Excellent → Weak) and Distance (Nearest First). An option is **disabled** ("Not available for these jobs") when the jobs lack the data it needs. The mock jobs have no distance, so Distance is disabled rather than sorting on invented distances.
+- **New `src/components/FilterSheet.js`:**
+  - Expandable sections for Country, Location, Company, Experience, Job Title, Aging and State, each showing `Any`, the one selected value, or `N selected`.
+  - Search boxes for Location, Company, Job Title and State. Multi-select checkboxes, except Aging, which is single-select.
+  - Each option shows its count of jobs in the current dataset.
+  - **Clear all**, and a sticky **Show N jobs** button. The sheet edits a draft, and Show N jobs applies it.
+- **New `src/utils/jobFilters.js`:** sort options and their availability, filter section definitions, option and count building, filtering (search covers title, company, location, matched and gap skills; plus Verified, Last 24 hours and the sheet filters) and sorting.
+- **`src/screens/RecommendedScreen.js`:**
+  - Sort opens the Sort sheet; All Filters opens the filter sheet and its label shows the active count, e.g. "All Filters (1)".
+  - The tab label shows how many jobs remain after filtering.
+  - When filters hide every job, it shows "No jobs match your filters" with **Clear filters**.
+- **`src/components/JobCard.js`:** fit pill colours. Excellent Fit is green, as in the reference illustration; Average and Weak Fit get their own colours.
+- **`src/theme.js`:** a `cta` colour for the Show N jobs button. It's solid, because a gradient would need a new dependency.
+- **`src/data/mockRecommendations.js` (mock data):** added `country` and `experience` to each job and varied `fitLabel` (Excellent, Good, Average), so the Experience, Country and Fitment controls have data to work with. It's still labelled MOCK, and still has no distance data.
+
+### Verification and results
+- `npx expo-doctor`: passed **20/20**. `npx expo export --platform android`: bundle built.
+- **Emulator (guest, after the resume flow):**
+  - The Sort sheet matches the reference: four radios, Recommended selected, a floating close button, and Distance disabled. Choosing Fitment put the Excellent Fit jobs first.
+  - The All Filters sheet matches the references: seven sections showing "Any", Clear all, and Show 5 jobs.
+  - Location expands to show a search box and checkboxes with counts. Selecting Bengaluru and Pune shows "2 selected" and Show 3 jobs. Searching "ind" leaves Indore.
+  - Applying shows Recommended (3), "All Filters (1)", and only Bengaluru and Pune jobs.
+  - Reopening the sheet keeps the selection. Company search "orb" leaves Orbitron Systems (1). Closing without applying leaves the list unchanged.
+  - Verified chip: 3 → 2. Last 24 hours: 5 → 1 and back. Searching "zzz" shows "No jobs match your filters", and Clear filters restores 5.
+  - The All Jobs, Saved and Skills tabs still open. No Metro errors.
+- **Not tested:** iOS and a physical device. Experience, Job Title, Aging and State were checked visually only (same component as Location and Company).
+
+### Data notes
+- All counts and options come from the 5 **mock** jobs. Real counts need the backend.
+- Distance sort needs real location data (user and job coordinates). It's disabled until then.
+- `mockRecommendations.js` rec-1 has the location "Benhgaluru, Karnataka", a spelling changed in the working file since the previous prompt. It appears as a separate Location option. Left as is; flagged to the user.
+
+### AI mistakes and fixes
+- A Node regex edit to add the new mock fields silently failed to match (escaping again). Only the header comment changed. Caught by checking the result, and redone with direct edits.
+
+---
+
+## Prompt #11: Job Details screen (guest and signed-in)
+
+- **Date/time:** 2026-10-24, about 04:15–04:35 IST
+- **AI tool:** Claude
+- **Objective:** Build the Job Description screen from the 7 reference screenshots and open it from the job lists, with guest locks and signed-in behaviour driven by the session.
+
+### Exact prompt
+
+````
+# Prompt #11: Implement Job Details Screen — Guest and Authenticated States
+
+We are continuing Phase 2: UI Development in the existing React Native Expo JavaScript project.
+
+I am providing reference screenshots of the Job Details screen. Study every screenshot carefully before making any changes. These screenshots are the source of truth for the UI and behavior.
+
+## 1. Objective
+
+Implement the Job Details screen and connect it to the existing Recommended Jobs and All Jobs listings.
+
+The implementation must support both:
+- Guest users who are not logged in.
+- Authenticated users who are already logged in.
+
+Do not implement only a static screen. Use the existing navigation, selected job data, session state, theme, and components.
+
+## 2. Job Details Screen UI
+
+Match the supplied screenshots as closely as possible.
+
+### A. Header
+- Back navigation.
+- Title: `Job Description`.
+- Email/application-related action with a lock indicator when applicable.
+- Share action.
+- Keep the header styling and spacing consistent with the reference screenshots.
+
+### B. Selected Job Summary Card
+Display the selected job's actual available information:
+- Job title.
+- Company name.
+- Verification badge when the job is verified.
+- Fit label, such as Good Fit or Excellent Fit, when available.
+- Location.
+- Posting age.
+- Save/bookmark action.
+
+The card must represent the job the user tapped. Do not display hardcoded details from a different job.
+
+### C. Job Skill Match Insights
+Create the section shown in the screenshots.
+
+**Exact Match**
+- Display the number of matching skills.
+- Render the matching skills as individual rounded chips.
+
+**Gaps**
+- Display the number of missing or unmatched skills.
+- Render the gaps as individual chips.
+- Show the Learning/book icon beside a gap when the existing app supports learning for that skill.
+- Tapping a learning action must reuse the existing Learning navigation/behavior. Do not invent a new learning system.
+
+If the selected job has no matching-skill or gap data, handle that gracefully instead of inventing skills or counts.
+
+### D. Job Description Content
+Display the job description as readable, vertically scrollable content.
+
+The reference screenshots show sections such as:
+- Job Description.
+- About the company.
+- The Role.
+- What You'll Do.
+- Tech Stack.
+- You're a Fit If.
+- Bonus Points.
+- Why the company.
+
+Render the actual available description and section content. Preserve paragraphs, bullet points, headings, and spacing where possible.
+
+Important:
+- Do not hardcode EngineerBabu or Enterprise Bot content for every job.
+- Use the selected job's available description and metadata.
+- If descriptions come from a single raw text field, render them cleanly and preserve their content.
+- Do not fabricate missing company details or job requirements.
+- Support long descriptions without clipping or overlapping content.
+
+### E. Fixed Bottom Apply Action
+Reproduce the bottom `Apply on company site` action shown in the screenshots.
+
+- Keep it fixed above the Android system navigation area.
+- Ensure the description scrolls behind neither the button nor the button's touch area.
+- Use the selected job's actual application URL if one exists.
+- Open the URL using the existing project conventions or an appropriate React Native linking mechanism.
+- If the URL is missing, handle that gracefully. Do not invent an application URL.
+
+## 3. Guest vs Authenticated Behavior
+
+Use the existing Redux/session state and current application architecture to determine whether the user is a guest or authenticated.
+
+### Guest user
+- Display the lock indicators and locked actions as shown in the guest reference screenshots.
+- For locked actions, use the existing sign-up or authentication flow.
+- Do not allow a guest action to silently behave as though the user is authenticated.
+- Preserve access to the job description itself.
+
+### Authenticated user
+- Match the authenticated reference screenshot, including the unlocked appearance of actions where shown.
+- Allow save/bookmark behavior through existing functionality when available.
+- Use the existing application/session state; do not create a separate fake login state.
+- Preserve the selected job and return navigation.
+
+Do not invent different business rules where the screenshots or existing implementation do not specify them. Report any ambiguous behavior rather than silently assuming it.
+
+## 4. Navigation and Data Integration
+
+- Open Job Details when a user taps a job card from Recommended Jobs or All Jobs.
+- Pass the selected job through the existing navigation mechanism.
+- Ensure the correct job is displayed every time.
+- Preserve the back-navigation destination and existing list state, including search, sort, and filters where the current navigation architecture supports it.
+- Reuse existing job card, theme, icons, session selectors, and navigation patterns wherever possible.
+- Do not rebuild Recommended Jobs or All Jobs.
+- Do not break the existing resume upload and recommendation flow.
+
+## 5. Implementation Constraints
+
+Before editing:
+1. Inspect the current navigation setup and screen registration.
+2. Inspect the existing job data model and mock/API data.
+3. Inspect the existing JobCard and other reusable components.
+4. Inspect authentication/session state and save/share behavior.
+5. Inspect the existing Learning navigation.
+6. Read `AI_NOTES.md`, `PROGRESS.md`, and `README.md`.
+
+Then implement the screen using the existing architecture.
+
+Additional requirements:
+- JavaScript only; no TypeScript.
+- Do not introduce unnecessary dependencies.
+- Do not hardcode a single job's information into the reusable screen.
+- Do not add a backend, database, or recommendation algorithm in this task.
+- Do not rebuild other screens or perform unrelated refactoring.
+- Keep the existing theme and UI conventions consistent.
+- Use actual available data and clearly identify any missing data-dependent functionality.
+
+## 6. Testing
+
+Run the app on the Android emulator and inspect the actual rendered UI.
+
+Test the following:
+
+1. Open Job Details from Recommended Jobs.
+2. Open Job Details from All Jobs.
+3. Confirm that the selected job's title, company, location, fit, skills, and description are correct.
+4. Verify scrolling through a long job description.
+5. Verify the fixed Apply on company site button.
+6. Test guest behavior for locked actions.
+7. Test authenticated behavior for save/bookmark and other supported actions.
+8. Verify back navigation and preservation of the previous list state.
+9. Test jobs with missing descriptions, skills, or application URLs.
+10. Check for runtime errors and layout problems.
+
+Run the available project checks and fix issues introduced by this implementation.
+
+## 7. Documentation and Final Report
+
+Update `AI_NOTES.md` and `PROGRESS.md` with the actual work completed.
+
+Report:
+- Files created or modified.
+- How the Job Details screen receives and renders the selected job.
+- Guest vs authenticated behavior implemented.
+- Navigation and Learning integration.
+- Emulator testing results.
+- Missing data or functionality that remains pending.
+
+Do not start another screen or unrelated task. Complete the Job Details implementation and wait for my next instruction.
+````
+
+(Seven screenshots were attached: a signed-in summary, a guest summary, and five guest description scroll positions.)
+
+### Changes
+- **New `src/screens/JobDetailsScreen.js`**, registered as `JobDetails` in the native stack (full screen, no tab bar):
+  - Header: back, "Job Description", email (with a lock for guests) and share.
+  - Summary card: title, verified badge, company, fit pill, bookmark (lock for guests), location and posting age.
+  - Job Skill Match Insights: "Exact Match (N)" chips and "Gaps (N)" chips with a book icon. It shows a message when the job has no skill data.
+  - Description: rendered from the job's raw `description` text. Shows "No description was provided for this job." when it's empty.
+  - Fixed footer **Apply on company site** with a lock for guests. Shows "Application link not available" when there's no URL.
+- **New `src/utils/parseDescription.js`:** turns raw text into heading, bullet and paragraph blocks ("## " = heading, "- " or "• " = bullet, blank line = new paragraph).
+- **New `src/hooks/useSignUpPrompt.js`:** the shared guest "Sign up to unlock" prompt, which opens the Profile tab. Moved out of `RecommendedScreen` so both screens use it.
+- **`src/components/JobCard.js`:** the whole card is tappable (`onPress`). `FIT_STYLES` and `LockableIcon` are exported for reuse.
+- **`src/screens/RecommendedScreen.js`:** tapping a card opens `JobDetails` with `{ job }`. Uses the shared sign-up hook.
+- **`src/navigation/AppNavigator.js`:** registers `JobDetails`.
+- **`src/data/mockRecommendations.js` (MOCK):** added fictional `description` text and `example.com` `applyUrl`s. rec-4 has no URL and rec-5 has no description, to test those states. No real company content was copied.
+
+### How the selected job reaches the screen
+- `RecommendedScreen` passes the tapped job object as `route.params.job`. Everything shown comes from that object, so nothing is hardcoded for a particular job.
+- The list screen stays mounted underneath the stack screen, so search, sort, filters and scroll position survive Back.
+
+### Guest vs signed-in (from `selectIsGuest` in Redux)
+- **Guest:**
+  - Email, bookmark and Apply show lock badges, and each opens the shared "Sign up to unlock" prompt.
+  - Gap chips also prompt sign-up.
+  - The description stays fully readable.
+- **Signed in:** no lock badges.
+  - Apply opens `applyUrl` with `Linking.openURL`.
+  - A gap chip opens the Learning tab with `{ skill }`.
+  - Bookmark and email show "Coming soon": there is no saved-jobs or email feature yet. This is flagged as ambiguous rather than invented.
+
+### Verification and results
+- `npx expo-doctor`: passed **20/20**. `npx expo export --platform android`: bundle built (also rebuilt after reverting the temporary test patch).
+- **Emulator, guest:**
+  - After the resume flow, with the Verified filter on (Recommended (4)), tapping the Northwind card opened Job Details with the right title, company, location, "5d ago", Good Fit, Exact Match (5) and Gaps (2). The layout matches the guest references.
+  - Scrolling the long description showed headings and bullets, and the Apply button stayed fixed above the navigation bar.
+  - Apply and email showed the sign-up prompt.
+  - Back returned to the list with Verified still on and Recommended (4).
+  - The Lumen job (no URL) showed "Application link not available". The Saffron job (no description, no gaps) showed "No description was provided for this job." and no Gaps row.
+- **Emulator, signed in** (temporary test user in `sessionSlice` initial state, restored afterwards; 0 `TEMP-` markers left):
+  - The Bluepeak job details had no lock badges, matching the authenticated reference.
+  - Bookmark showed "Saving jobs isn't available yet."
+  - The Learn Nestjs chip opened the Learning tab.
+  - Apply launched `https://example.com/...` in Chrome. The system log shows the `VIEW` intent from Expo Go.
+- **Not tested or not possible:**
+  - **Opening Job Details from All Jobs:** All Jobs has no job list. It's a map plus a list placeholder with no job data, so there's nothing to tap.
+  - iOS and a physical device.
+
+### Emulator issues (not app code)
+- In one run, Expo Go's process crashed with `ArrayIndexOutOfBoundsException` inside Android's `OverScroller` (a framework bug triggered by a touch during a scroll fling). It didn't happen again on rerun.
+- Chrome crashed in its first-run activity after opening the apply link. Expo Go resumed normally.
+
+### Remaining / ambiguous
+- **All Jobs → Job Details:** needs an All Jobs job list (seeded jobs from the backend).
+- **Save and email for signed-in users:** "Coming soon" until saved jobs and email exist.
+- **Returning from Learning:** opening Learning from Job Details closes the details screen, so Back from Learning goes to the list, not the job.
+- **Mock data only:** descriptions and links are mock. Real ones come from the backend.
+
+### AI mistakes and fixes
+- The first test tapped the card by its title text, but the title contains a nested verified icon, so the exact text didn't match. Fixed by tapping the card's accessibility label ("<title> at <company>").
+
+---
+
+## Prompt #12: Profile, Experience and Education UI, with a simulated resume flow
+
+- **Date/time:** 2026-10-24, about 04:40–05:00 IST
+- **AI tool:** Claude
+- **Objective:** Build the Profile tab (profile card, resume card, Experience and Education sections), the Experience and Education list screens with add, edit and delete, and make the resume flow reusable from Profile. Frontend only, with mock data and simulated processing.
+
+### Exact prompt
+
+````
+## Task: Build the Profile UI and Resume Upload Flow — Frontend Only
+
+We are currently in the **UI development phase** of our existing React Native Expo application using JavaScript.
+
+I will provide all the reference screenshots. Follow those screenshots closely and implement only the frontend UI.
+
+### 1. Profile Screen
+- Update the existing Profile screen according to the provided screenshots.
+- Show the profile header, avatar with initials, name, email, phone, current role, current location, preferred work locations, and total experience.
+- Add the resume card with filename, replace/upload icon, and download icon.
+- Add the Experience section with Add, Edit, and Show All actions.
+- Add the Education section with Add and Edit actions.
+- Keep the existing bottom navigation and visual styling.
+
+### 2. Experience and Education Screens
+- Implement or update the Experience screen to match the screenshots, including experience cards and the Add Experience button.
+- Implement or update the Education screen using the same design language.
+- Create working frontend navigation between Profile, Experience, and Education screens.
+- Use local mock data for now.
+
+### 3. Resume Upload UI Flow
+Create the frontend screens and interactions for this flow:
+
+1. **Guest without a resume:** Show the existing Recommended Jobs empty state with an Upload Resume action.
+2. **Resume selection:** Open the device file picker if the existing Expo setup supports it. Otherwise, implement a clearly identified temporary UI placeholder.
+3. **Parsing/loading:** Display the supplied resume-processing screen with progress indicators.
+4. **Profile confirmation:** Show the supplied confirmation form populated with sample extracted data.
+5. **Recommendation loading:** Display the existing recommendation-processing state.
+6. **Recommendations ready:** Navigate to the existing Recommended Jobs UI, with separate guest and logged-in visual states where applicable.
+
+The same upload and confirmation UI must be reusable when the user chooses to replace their resume from the Profile screen.
+
+### 4. Frontend Behavior
+- Use local mock data and component state only.
+- Make buttons, navigation, accordions, edit actions, and screen transitions work where applicable.
+- Simulate processing and recommendation states for UI demonstration only.
+- Do not implement actual resume parsing, AI, authentication, backend APIs, database operations, or recommendation algorithms.
+- Do not create fake backend integrations.
+- Reuse existing components, navigation, assets, and styling wherever possible.
+- Do not redesign unrelated screens.
+
+### 5. Completion
+Implement the UI directly in the existing project. After making changes, list the files created or modified and explain how to run the Expo app to preview the screens.
+
+**Scope restriction: FRONTEND UI ONLY. No backend or API work in this task.**
+````
+
+(Three screenshots were attached: the Profile screen at two scroll positions, and the Experience list.)
+
+### Privacy decision
+- The reference screenshots contain the user's real name, email, phone, employers and college. None of it was copied into the code. The sample "extracted" profile (`src/data/mockResume.js`) is a fictional person (Riya Sharma, `riya.sharma@example.com`) with the fictional companies already used in the mock jobs.
+
+### Changes
+- **Simulated parsing (MOCK, requested in this prompt):**
+  - `src/services/resumeService.js` `parseResume` now waits 3 s and returns the sample profile, including `experiences` and `education`. It's documented as MOCK in the code.
+  - Before this prompt it reported "not connected". The failure / manual-entry path is still in the processing screen for real errors.
+- **`ProfileProcessingScreen`:** the steps now advance on a timer (checkmark → spinner → pending). This is a UI-only progress indicator, since the parser reports no real progress. All steps are marked done only when parsing resolves.
+- **`returnTo` through the resume flow:**
+  - `useResumeUpload({ returnTo })` → `ResumeConfirm` → `ProfileProcessing` → `ProfileConfirm`.
+  - When the flow starts from Profile, it ends back on Profile instead of Recommended.
+  - Editing the profile from Profile reuses `ProfileConfirm` the same way.
+- **New `src/navigation/ProfileNavigator.js`:** a stack inside the Profile tab (so the tab bar stays, as in the reference) with ProfileHome, Experience, Education, ExperienceForm and EducationForm. `RootNavigator` uses it in place of the Profile placeholder.
+- **New `src/screens/ProfileScreen.js`:**
+  - Header "Profile" with Settings ("Coming soon").
+  - Profile card: initials avatar, name, email, phone, edit pencil, role, current location, preferred locations, total experience.
+  - Resume card: file name, replace (restarts the resume flow and returns to Profile), and download, which shows "Not available yet" because resumes aren't stored anywhere.
+  - Experience section: add, edit, first 2 entries, "Show all N experiences".
+  - Education section: add and edit.
+  - Before any profile exists, an empty state with Upload Resume.
+- **New `src/screens/ProfileEntriesScreen.js`:** one list screen used for both Experience and Education (header pencil toggles edit mode with per-card edit and delete-with-confirmation, plus a bottom "Add Experience" / "Add Education" button).
+- **New `src/screens/ExperienceFormScreen.js` and `EducationFormScreen.js`:** add and edit forms with validation (required fields, MM/YYYY or YYYY, end not before start, "I currently work here").
+- **New components:** `ScreenHeader`, `RoundIconButton`, `FormField`.
+- **`src/store/profileSlice.js`:** new `profileEntrySaved` and `profileEntryRemoved` reducers for `profile.experiences` / `profile.education`.
+- **`src/utils/format.js`:** new `formatMonthYear`, `formatDateRange` ("Apr 2026 – Present · 6 mos") and `getInitials`.
+
+### Verification and results
+- `npx expo-doctor`: passed **20/20**. `npx expo export --platform android`: bundle built. All icons exist.
+- **Emulator (guest):**
+  - Profile tab empty state → Upload Resume → picker → confirmation → "Building Your Profile", with steps advancing (step 1 checked, step 2 spinner) → form pre-filled with the sample data → Done → back on **Profile**.
+  - The Profile layout matches the references: avatar "RS", details, resume card showing `Test_Resume.pdf`, and Experience with 2 entries plus "Show all 4 experiences".
+  - **Experience list** matches the reference, with correct durations (6, 8, 9, 8 mos).
+  - Edit mode shows edit and delete. Add with an empty form shows the validation errors. Adding "QA Engineer, 01/2023–02/2024" shows "Jan 2023 – Feb 2024 · 1 yr 1 mo" at the top. Delete asks for confirmation, then removes it.
+  - **Education:** "Test University, M.Tech" added above the sample entry.
+  - Edit profile → form → Done returns to Profile. Replace resume → flow → returns to Profile.
+  - The Jobs tab shows Recommended (5) (mock recommendations load after the profile is saved).
+  - No JavaScript errors or crashes in logcat or Metro.
+- **Not tested:** the signed-in Profile look (the screenshots show the same layout; there's no sign-in yet), iOS, and a physical device.
+
+### Notes and limitations
+- The "Profile | GBEO4700" ID from the reference isn't shown, because there's no account ID without a backend.
+- Settings and resume download show "not available" messages.
+- Replacing the resume overwrites experiences and education with the new parse result, which is the same sample every time.
+- All profile data is in memory (Redux) and is lost on app restart.
+- The guest "Sign up" prompt still opens the Profile tab, which now shows the profile rather than a sign-in screen. No auth screen exists yet.
+
+### AI mistakes and fixes
+- The first add-form test couldn't find the empty date fields, because uiautomator reports an empty field's placeholder as its text. A `desc:Back` tap then closed the form. Fixed in the test by matching the date fields by their placeholders ("04/2024", "10/2025"). The app code was fine.
+
+---
+
+## Prompt #13: Make the Profile add / edit icons non-clickable
+
+- **Date/time:** 2026-10-24, about 05:00 IST
+- **AI tool:** Claude
+- **Objective:** On the Profile screen, the add (+) and edit (✎) icons should be display-only. This undoes the click behaviour added in Prompt #12.
+
+### Exact prompt
+
+````
+one thing need to the correction here that is jo edit wale buttons hai ne profile section edit and add wali wo clickable nahi hongi usko reverrt akr do ok
+````
+
+(Meaning: the edit and add buttons in the Profile section should not be clickable; revert that.)
+
+### Changes
+- **`src/components/RoundIconButton.js`:** without `onPress`, it renders as a static, disabled icon, with no press feedback and no button role.
+- **`src/screens/ProfileScreen.js`:** removed the press handlers from the profile card's edit pencil and from the + / ✎ icons on the Experience and Education sections. Also removed the now-unused `editProfile` handler and the `onAdd` / `onEdit` props.
+- **Unchanged:**
+  - On Profile: "Show all N experiences", the resume replace/download buttons and Settings.
+  - The Experience / Education list screens and their forms. They're still reachable through "Show all experiences", and that screen's own edit toggle and "Add Experience" button still work. This was not part of the request, so it was left as is.
+
+### Verification and results
+- `npx expo export --platform android`: bundle built.
+- **Emulator:**
+  - After the resume flow, the uiautomator dump shows the four section icons as `enabled="false"`.
+  - Tapping the profile pencil, Experience + and Experience ✎ kept the app on Profile, with no form or list opened.
+  - "Show all 4 experiences" still opens the Experience list.
+- The only log warning was "Cannot connect to Expo CLI", a dev-server connection notice, not an app error.
+
+### AI mistakes and fixes
+- One edit targeted a comment that didn't exist in the file, so it failed and nothing changed. It was redone against the actual `SectionCard` code.
+
+---
+
+## Prompt #14: Real interactive map with 100+ mock jobs (All Jobs)
+
+- **Date/time:** 2026-10-24, about 05:10–05:30 IST (work committed by the user as `9b475a2 completed the map`)
+- **AI tool:** Claude
+- **Objective:** Replace the hand-drawn map with a real interactive map, and put 100+ mock jobs on it at real coordinates, with clustering, a job preview, a map/list switch and working filters.
+
+### Exact prompt
+
+````
+# Task: Replace the Hardcoded Map with a Real Interactive Map and 100+ Mock Jobs
+
+We are developing the frontend UI of an existing React Native Expo application using JavaScript.
+
+The current Opportunities map screen uses a hardcoded or static map representation. Replace it with a real, interactive geographical map and populate it with at least 100 realistic frontend mock jobs positioned using actual geographic coordinates.
+
+**Important:** Implement this directly in the existing project. Inspect the current code before making changes. Do not create a separate demo app or redesign unrelated screens.
+
+## 1. Inspect the Existing Project
+
+Before implementation:
+
+- Inspect the existing Expo SDK version and React Native version.
+- Review `package.json`, installed dependencies, navigation structure, and the current map screen.
+- Understand the existing UI components, styling, filters, sorting, and Map/List switching.
+- Select a compatible mapping library based on the existing project setup.
+
+Do not upgrade Expo or React Native unnecessarily. Avoid breaking existing functionality.
+
+## 2. Use a Real Interactive Map
+
+- Replace the static map image, fake map background, or hardcoded geographical representation with a real interactive map.
+- Do not use Google Maps or require a Google Maps API key.
+- Evaluate an Expo-compatible solution using OpenStreetMap-compatible map tiles, such as React Native Maps with an appropriate tile provider, or MapLibre if compatible with the project.
+- Choose a tile provider whose terms permit the application's intended production use.
+- Do not assume that public OpenStreetMap tile servers provide unlimited or guaranteed production access.
+- Display real geographical features, roads, boundaries, and city locations.
+- Support map panning, pinch-to-zoom, and appropriate map attribution.
+- Ensure the implementation targets an actual Android production build, not just a screenshot or web preview.
+- Document any required development build, native configuration, permissions, or provider credentials.
+
+## 3. Create at Least 100 Dummy Jobs
+
+Create a centralized frontend mock-data file containing **at least 100 distinct job records**.
+
+Distribute the jobs across multiple real Indian cities, including:
+
+- Bengaluru
+- Pune
+- Chennai
+- Hyderabad
+- Mumbai
+- Delhi NCR
+- Noida
+- Gurugram
+- Kolkata
+- Ahmedabad
+
+Use realistic, geographically valid coordinates for individual job locations, such as plausible office districts or business areas within each city.
+
+Do not place every job at the city center. Jobs within the same city should have distinct, geographically plausible coordinates. Avoid generating random screen positions or arbitrary latitude/longitude values.
+
+Each job record should contain fields such as:
+
+- `id`
+- `title`
+- `companyName`
+- `location`
+- `latitude`
+- `longitude`
+- `experience`
+- `jobType`
+- `postedAt`
+- `salary`
+- `description`
+- `requiredSkills`
+
+Use realistic sample job titles and companies relevant to a job-search application, including React Native Developer, React Developer, Node.js Developer, MERN Stack Developer, Backend Developer, Software Engineer, and other relevant roles.
+
+Use consistent data types and unique IDs. Validate that all coordinates are numeric and within valid latitude/longitude ranges.
+
+**Data integrity requirements:**
+
+- All 100+ jobs must come from the same centralized mock dataset.
+- City-level job counts must be calculated from the dataset wherever practical.
+- Company markers and individual job markers must be consistent with the dataset.
+- Do not maintain unrelated hardcoded counts that contradict the actual mock records.
+- Keep mock jobs clearly identified in the code as demonstration data, not verified real vacancies.
+- Do not call backend APIs or claim that these jobs are real openings.
+
+## 4. Render Jobs on the Map
+
+- Render job markers using each job's actual `latitude` and `longitude`.
+- Position markers geographically through the selected map library.
+- Display appropriate job markers, city-level markers, or job-count clusters depending on the current zoom level.
+- When several jobs are close together, prevent excessive overlap using clustering or another appropriate approach supported by the selected library.
+- When the user zooms in, allow individual job locations to become visible.
+- When the user taps an individual marker, display a job preview containing the job title, company, location, and relevant details.
+- When the user taps a cluster, show the relevant job count and allow the user to explore the clustered jobs.
+- Ensure that markers remain attached to their geographical coordinates while the map is panned and zoomed.
+- Add functional zoom-in and zoom-out controls.
+- Implement current-location interaction when location permissions are available.
+- Handle denied or unavailable location permissions gracefully without crashing.
+
+## 5. Preserve the Existing UI
+
+Keep the current screen's visual design and layout as close as possible to the supplied reference screenshot.
+
+Preserve the existing:
+
+- Opportunities header
+- Recommended, All Jobs, Saved, and Applied tabs
+- Search field
+- Filter chips
+- Sort controls and sort sheet
+- All Filters sheet
+- Floating map controls
+- View Companies action
+- View Jobs action
+- Agent Sigma floating button, if already present
+- Bottom navigation
+
+Do not remove or unnecessarily redesign existing components to accommodate the map.
+
+## 6. Map/List Synchronization
+
+- Implement functional Map/List switching using the same centralized mock-jobs dataset.
+- The List view must display the same jobs represented on the map.
+- Search must filter jobs by relevant fields, such as title, company, and location.
+- Existing filter and sorting interactions must work with the mock dataset.
+- Keep the existing Recommended, Verified, and Last 24 Hours controls functional where they already exist.
+- Ensure that changing filters updates the visible job markers, clusters, and list results consistently.
+- Ensure that displayed counts reflect the relevant filtered dataset wherever practical.
+- Avoid duplicating mock-job arrays separately inside the Map and List screens.
+
+## 7. Keep the Scope Frontend-Only
+
+This task is limited to the existing frontend UI and its local mock data.
+
+Do not implement:
+
+- Backend APIs
+- Database integration
+- Authentication changes
+- Live job fetching
+- AI recommendations
+- AI-powered search
+- Real company or vacancy verification
+
+Keep the implementation structured so that the mock-data source can later be replaced by backend API responses without rewriting the entire map UI.
+
+## 8. Verification Requirements
+
+After implementing the changes:
+
+1. Run the app using the project's supported Expo workflow.
+2. Verify that real map tiles load.
+3. Verify that the map can be panned and zoomed.
+4. Verify that at least 100 mock jobs are present in the centralized dataset.
+5. Verify that markers use the correct coordinates from their corresponding job records.
+6. Verify that clusters and city-level job counts are consistent with the dataset.
+7. Verify that marker selection displays the correct job preview.
+8. Verify that Map/List switching, search, filters, and sorting work together.
+9. Check Android compatibility and document any required native setup.
+10. Verify that the chosen tile provider's usage terms are suitable for the intended deployment.
+
+If you cannot run the Android build or verify a feature in the current environment, clearly state what could not be tested. Do not claim that unverified functionality works.
+
+## 9. Final Implementation Report
+
+After completing the implementation, report:
+
+- The selected map library and tile provider, including the reason for the choice.
+- Any production usage limitations or configuration requirements.
+- The total number of mock jobs created and the cities covered.
+- The files created or modified.
+- The commands required to run the application.
+- Any remaining limitations or verification steps that require a physical device or Android build.
+
+**Final instruction:** Implement the changes directly in the existing codebase. Do not stop at a plan, sample snippet, static image, or implementation instructions. Preserve the existing app architecture and unrelated screens, and avoid unnecessary dependencies or unrelated changes.
+````
+
+### Choices
+- **Map:** Leaflet 1.9.4 with leaflet.markercluster 1.5.3, running inside `react-native-webview`. `react-native-maps` on Android is built on the Google Maps SDK and needs a Google API key, which the prompt ruled out. MapLibre needs a custom native build. The WebView approach works in Expo Go and in a normal production APK with no native map setup.
+- **Tiles:** public OpenStreetMap server by default, with attribution shown. That server's policy only allows light use, so production must set `EXPO_PUBLIC_MAP_TILE_URL` / `EXPO_PUBLIC_MAP_ATTRIBUTION` to a provider and plan that permits the traffic (see `src/config/map.js`).
+- **Location:** `expo-location`, with its config plugin and a when-in-use permission text in `app.json`.
+
+### Changes
+- **New:**
+  - `src/data/mockJobs.js`: **120 MOCK jobs**, 12 in each of Bengaluru, Pune, Chennai, Hyderabad, Mumbai, New Delhi, Noida, Gurugram, Kolkata and Ahmedabad, placed in real business districts with small offsets. Includes `validateJobs`.
+  - `src/config/map.js`, `src/components/JobsMap.js`, `JobListItem.js`, `CompanySheet.js`, `src/utils/geo.js`.
+- **Rewritten:** `src/screens/OpportunitiesScreen.js` (map and list over one filtered dataset).
+- **Changed:** `JobsNavigator.js` (swipe turned off on All Jobs so map drags don't switch tabs), `jobFilters.js` (search includes area and required skills), `mockMap.js` (cut down to UI constants), `app.json`, `package.json`.
+- **Removed:** `MapPlaceholder.js`.
+- `npx expo install --fix` updated expo 58.0.17 → 58.0.19 (patch release, flagged by expo-doctor).
+
+### Verification
+- Dataset checked in Node: 120 jobs, 120 unique IDs, 120 distinct coordinates, 12 per city, all within valid ranges.
+- `expo-doctor` passed 20/20 and the Android export built.
+- **Emulator:**
+  - Real OpenStreetMap tiles loaded with attribution. Clusters showed 36 (NCR = Delhi + Noida + Gurugram), 24, 24, 12, 12 and 12, which add up to 120. "View jobs (120)" was shown.
+  - Tapping a cluster showed "36 jobs in this area · 16 companies". Zoom in split NCR into area clusters, and further zoom split Gurugram into Sector 44, Sohna Road and Golf Course Road.
+- **Not verified** (testing was interrupted by the user):
+  - tapping a single job pin and its preview
+  - the list view, search, filters and sort on this screen
+  - the "Last 24 hours" chip
+  - current location (emulator GPS was set to Bengaluru but never tested)
+  - pinch-zoom by hand
+
+---
+
+## Prompt #15: Shared Google-only guest login sheet
+
+- **Date/time:** 2026-10-24, about 13:35–13:50 IST
+- **AI tool:** Claude
+- **Objective:** One reusable "Guest Mode" login bottom sheet with the user's male illustration and a single "Continue with Google" button, opened from every protected entry point, with honest handling of sign-in that can't complete yet.
+
+### Exact prompt
+
+The user's message was "problem" followed by this pasted task (the earlier "start the aap" / server questions were handled separately):
+
+````
+# Task: Implement a Reusable Google-Only Guest Login Bottom Sheet
+
+Implement a single, reusable Google-only authentication bottom sheet in the existing React Native Expo application using JavaScript.
+
+Use the supplied Guest Mode screenshot as the exact UI reference. The user has already generated the male character illustration and placed it in the project's assets folder.
+
+**Important:** Inspect the existing project before changing anything. Implement directly in the existing codebase. Do not create a separate app or redesign unrelated screens.
+
+## 1. Inspect the Existing Project
+
+Before implementation:
+
+- Inspect the Expo SDK version, React Native version, `package.json`, navigation structure, and current authentication state management.
+- Identify existing login dialogs, guest-mode logic, protected actions, and screen-level authentication checks.
+- Locate the existing male illustration asset in the project's assets folder.
+- Reuse the existing architecture and JavaScript. Do not introduce TypeScript.
+- Avoid unnecessary dependency upgrades or unrelated changes.
+
+## 2. Reproduce the Guest Login Bottom Sheet
+
+Recreate the supplied screenshot as closely as possible.
+
+Preserve:
+
+- White bottom sheet with rounded top corners and a small drag indicator.
+- Lock icon and blue `GUEST MODE` badge.
+- Close button in the top-right corner.
+- Heading: `Get personalized job recommendations`, with the same black and blue text styling.
+- Supporting text: `Create an account to see roles matched to your skills, experience, and goals — refreshed every day.`
+- Three benefit rows:
+  - **Matches your skills** — Get relevant job recommendations.
+  - **Curated opportunities** — See high-quality roles from top companies.
+  - **Updated daily** — New opportunities are added every day.
+- Original spacing, typography, icon colors, illustration placement, and responsive layout.
+
+### Male Illustration
+
+Use the existing generated male PNG from the project's assets folder.
+
+- Locate the actual file rather than generating another image.
+- Use it as a transparent illustration on the right side of the dialog, similar to the female character's position in the reference screenshot.
+- Keep the text and benefits readable on the left.
+- Size and position the image appropriately for different device heights and widths.
+- Preserve the transparent background; do not place the entire dialog screenshot inside an image.
+- Do not use the female illustration if the male asset is available.
+
+## 3. Google Is the Only Login Option
+
+At the bottom of the dialog, show **one Google Sign-In button only**.
+
+- Retain the reference screenshot's button styling, rounded corners, border, shadow, and Google logo.
+- Use a clear label such as `Continue with Google`.
+- Remove the Apple and Email login buttons completely.
+- Do not implement Apple Sign-In, email/password login, OTP, or any other authentication provider.
+- Do not display three empty button spaces or leave unnecessary gaps where the removed buttons were.
+
+## 4. One Shared Dialog Across the Entire App
+
+Implement one reusable authentication bottom-sheet component and one centralized mechanism to open it.
+
+The same dialog must open whenever a guest user attempts to sign in or accesses a protected feature from any screen, including:
+
+- Opportunities
+- Recommended Jobs
+- All Jobs
+- Job Details
+- Saved Jobs
+- Applied Jobs
+- Profile
+- Any other existing screen or locked feature that requires authentication
+
+Examples:
+
+- Tapping `Sign up` in the header opens the shared dialog.
+- Tapping a locked Recommended Jobs feature opens the same dialog.
+- Tapping a protected action on the Job Details screen opens the same dialog.
+- Tapping a protected feature in Profile opens the same dialog.
+
+Do not create separate copies of the dialog for individual screens.
+
+Preserve the current screen behind the bottom sheet with the same dimmed overlay as the reference. The close button must dismiss the sheet and return the user to the screen they were viewing.
+
+Prevent multiple instances from opening simultaneously.
+
+## 5. Implement Actual Google Sign-In
+
+Before selecting an authentication library, verify its compatibility with the existing Expo SDK and React Native versions.
+
+- Implement real Google Sign-In using an appropriate solution for the existing Expo project.
+- Configure the necessary OAuth client IDs, redirect/deep-link handling, and platform configuration.
+- Do not require a Google Maps API key; this is Google authentication, not Google Maps.
+- Never hardcode OAuth secrets in the source code.
+- Keep required configuration in environment variables or the appropriate native configuration.
+- Handle cancellation, network failures, invalid tokens, missing credentials, and unsuccessful authentication gracefully.
+- Display an appropriate error message when sign-in cannot complete.
+- Do not simulate successful authentication or mark a user as logged in merely because the Google button was tapped.
+
+If the backend authentication service has not yet been implemented, complete the reusable UI and compatible sign-in setup that can be supported by the existing project. Clearly identify what remains necessary for secure backend authentication. Do not pretend that a verified backend session exists.
+
+When backend authentication is implemented, the backend must verify the Google identity token and establish the application's authenticated session. Do not trust a client-supplied name, email, or profile as proof of identity.
+
+## 6. Authentication State and Navigation
+
+- Integrate authentication state with the app's existing state-management architecture.
+- After successful authentication, update the guest/logged-in UI consistently across screens.
+- Close the dialog only after the authentication flow has succeeded according to the implemented authentication architecture.
+- If a guest opens the dialog while attempting a protected action, preserve that intended action or destination and resume it after successful login when appropriate.
+- If the user dismisses the dialog or cancels Google Sign-In, return them to their previous screen without marking them as authenticated.
+- Avoid duplicating authentication state across unrelated components.
+
+## 7. Scope Restrictions
+
+- Work only on the reusable Google login dialog and its necessary integration with existing screens.
+- Preserve unrelated screens and their existing visual design.
+- Do not implement backend APIs or database functionality that is outside the current task.
+- Do not add Apple, Email, OTP, or other authentication options.
+- Do not change the existing job map, mock jobs, filters, or other unrelated features.
+- Do not introduce TypeScript.
+
+## 8. Verification
+
+After implementation:
+
+1. Verify that the male PNG asset is used in the dialog.
+2. Verify that only one Google Sign-In button is visible.
+3. Verify that the dialog opens from multiple screens through the same shared component.
+4. Verify that the close button dismisses the dialog correctly.
+5. Verify that cancellation or failed Google authentication does not log the user in.
+6. Verify the authenticated and guest UI states wherever the available environment permits.
+7. Run the existing Expo workflow and fix regressions introduced by the changes.
+8. If real Google authentication cannot be tested because OAuth credentials or required native configuration are missing, document the exact missing configuration rather than claiming success.
+
+## 9. Final Report
+
+Report:
+
+- The shared dialog component and global opening mechanism.
+- The male PNG asset path used.
+- The files created or modified.
+- The Google Sign-In library and configuration selected.
+- Any OAuth credentials or backend verification still required.
+- The commands to run and test the application.
+- Which behaviors were actually verified and which remain untested.
+
+**Final instruction:** Implement the changes directly in the existing project. Reuse the existing male illustration asset, show Google as the only login option, and make the same bottom sheet accessible from every relevant screen. Do not stop at a plan or code snippets.
+````
+
+(No Guest Mode screenshot was actually attached, so the sheet follows the written description.)
+
+### Approach
+- **One sheet:** `src/components/GuestLoginSheet.js`, mounted once in `App.js` inside the `NavigationContainer`.
+- **One way to open it:** Redux `session.authSheet` (`authSheetOpened(intent)` / `authSheetClosed`). A request while the sheet is already open is ignored, so it can't open twice. `src/hooks/useRequireAuth.js` gives every screen `requireAuth(action, intent)` and `openLogin(intent)`. `intent` is a serializable screen target that's opened after a successful sign-in, via `navigationRef`.
+- **Google:** `expo-auth-session` (`providers/google`, `useIdTokenAuthRequest`) with `expo-web-browser` and `expo-crypto`, installed via `expo install` for SDK 58.
+  - Client IDs come from `EXPO_PUBLIC_GOOGLE_{ANDROID,IOS,WEB}_CLIENT_ID` (`src/config/auth.js`, `.env.example`). No secrets are in the app.
+  - Google's hook throws without a client ID, so the button checks first and otherwise shows a "not configured" error naming the missing variable.
+- **No fake login:**
+  - Google's ID token goes to `signInWithGoogleToken` in `src/services/authService.js`, which documents the backend contract (`POST /api/auth/google`, server-side token check).
+  - Until that backend exists, it always rejects. The user is never marked as signed in, and the sheet shows the reason.
+  - Cancelling or dismissing Google leaves the user as a guest.
+- **app.json:** `scheme: "spireai"` (redirect), `android.package` and `ios.bundleIdentifier` `com.spireai.iexchange` (needed to create OAuth client IDs). `expo-web-browser` plugin added by `expo install`.
+- **Illustration:** `frontend/assets/guest-login-male.png` (1087×1447, RGBA with transparency), on the right. Its width is 42% of the screen, up to 200 dp.
+- **Replaced the old Alert-based `useSignUpPrompt`** (deleted). Entry points now using the shared sheet:
+  - Jobs header "Sign up"
+  - Recommended: "Sign Up to Explore More", locked save and learning on cards
+  - Job Details: email, save, apply, gap skills (intent: return to that job)
+  - Saved and Applied: new "Sign in to continue" button for guests
+  - Profile: Settings and resume download (intent: Profile)
+
+### Verification and results
+- `expo-doctor` passed 20/20, and the Android export built.
+- **Emulator:**
+  - The sheet shows the badge, the heading (black plus blue), the subtext, the 3 benefit rows, the male PNG on the right and one "Continue with Google" button, with no Apple or Email.
+  - Tapping Google, with no client ID set, showed "Google Sign-In isn't configured for this build. Add EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID…" and the app stayed in guest mode.
+  - The ✕ and a backdrop tap both close the sheet and return to the same screen.
+  - The sheet opened from: Recommended landing, the Saved tab, the Jobs header "Sign up", Job Details Apply (✕ returned to the same job) and Profile Settings.
+- **Not verified:**
+  - A real Google account sign-in. It needs OAuth client IDs, plus a development build or APK with the registered package and SHA-1. Google no longer supports this flow inside Expo Go.
+  - The signed-in state after a real login, which needs the backend `/api/auth/google`.
+  - The "continue where you left off" navigation after sign-in, for the same reason.
+  - The Applied tab button (same component as Saved).
+
+### AI mistakes and fixes
+- The first test tapped the backdrop's "Close" label, whose centre sits under the sheet, so nothing closed. Fixed in the test by tapping the ✕ button.
+- The Profile "Settings" test first hit Expo Go's floating dev-tools button, which covers the same corner. Fixed by relaunching with `__expo_disable_fab=1`. It's Expo Go's own button, not app UI.
+- The benefit text ran slightly under the illustration. Widened the text column's right margin.
+
+---
+
+## Prompt #16: Whole-project review and backend plan (analysis only)
+
+- **Date/time:** 2026-10-24, about 14:00 IST
+- **AI tool:** Claude
+- **Objective:** Review the codebase, separate what's implemented from what's mock, map the work to the assessment, and propose a backend architecture and build order. No files were changed.
+- **Exact prompt:** the long "Task: Review the Entire iExchange Clone Project and Prepare for Backend Development" message (analysis and planning only; do not modify files).
+- **Result:** delivered in chat:
+  - Proposed stack: Express + Mongoose, Google ID-token verification on the server plus our own JWT, and multer for resumes.
+  - Collections: users, jobs, savedjobs, applications.
+  - Roadmap: phase 0 setup → jobs API → auth → profile → resume → saved/applied → rule-based recommendations.
+  - Open questions: Google needs a development build, Atlas or local MongoDB, unifying the two job formats, a profile skills field, recommendations for guests.
+  - Gaps found in the code: two different job data formats; no skills field on the profile; the Recommended tab title set in two places; All Jobs listings have no apply link or skill data; Saved and Applied are placeholders.
+
+---
+
+## Prompt #17: Guests can't apply — require login on Apply
+
+- **Date/time:** 2026-10-24, about 14:10 IST
+- **AI tool:** Claude
+- **Exact prompt:**
+
+````
+one correction need to if the user will not login na so he can not apply ok add tha logi also on the apply button did you get
+````
+
+- **Finding:** Apply was already gated for guests on jobs with an `applyUrl`. But jobs with no URL (all 120 All Jobs listings, and Recommended rec-4) showed a disabled "Application link not available" bar, so a guest got no login prompt.
+- **Change (`src/screens/JobDetailsScreen.js`):**
+  - Guests now always see the locked "Apply on company site" button, which opens the shared Guest Mode login sheet (intent: return to this job).
+  - Only signed-in users see "Application link not available" when there's no URL.
+  - `apply()` also returns early if there's no URL.
+- **Verification:**
+  - Android export built.
+  - Emulator, as a guest: All Jobs → View jobs (120) → "React Native Developer at Northwind Tech" → Apply showed the locked button → tapping it opened the GUEST MODE sheet with Continue with Google. No errors.
+- **AI mistakes:** none in this change. The original gap came from Prompt #11's design, where the missing-URL case was checked before the guest case.
+
+---
+
+## Prompts #18–#20: Guest-mode review, logout design, final decisions (review only)
+
+- **Date/time:** 2026-10-24, about 14:20–14:50 IST
+- **AI tool:** Claude
+- **Summary:**
+  - #18 reviewed the current guest flow and proposed guest-to-account rules.
+  - #19 added scenario G: logout through the existing Profile Settings icon.
+  - #20 confirmed the final decisions: a Settings sheet built on `BottomSheet` with the account email and Log out; reset to Jobs → All Jobs; separate storage namespaces; local JWT deletion; confirmation first; guest data never transferred is kept.
+- **No files were changed** in #18–#20.
+
+---
+
+## Prompt #21: first Phase A attempt (discarded by the user)
+
+- **Date/time:** 2026-10-24, about 14:55–15:30 IST
+- Phase A was implemented and tested, then **all of those changes were discarded** from the working tree, including the notes for #18–#21. The tree was back at `76c5ef4`.
+- The user then sent #22 (below) asking for Phase A again. It was rebuilt from scratch on `76c5ef4` and fully re-tested.
+
+---
+
+## Prompt #22: Phase A — guest device storage (implementation)
+
+- **Date/time:** 2026-10-24, about 15:35–15:55 IST
+- **AI tool:** Claude
+- **Exact prompt:** the "# Phase A: Guest Mode Device Storage — Implementation" message (sections 1–7: strict rules; dependencies limited to AsyncStorage and expo-file-system; guest data saved on the device; resume file handling; start-up and Redux; mandatory testing; completion criteria; Phase A only).
+
+### Dependencies (installed with `npx expo install`, SDK 58.0.19)
+- `@react-native-async-storage/async-storage` **2.2.0**
+- `expo-file-system` **~58.0.11**. It was already present as a dependency of another package; it's now our own. The installed API is the SDK 54+ `File` / `Directory` / `Paths` API, checked in `node_modules/expo-file-system/build`.
+- `expo-secure-store` was **not** added (it belongs to the auth phase). redux-persist was **not** used.
+
+### Files
+- **New:**
+  - `src/storage/keys.js`: `spire:guest:*` and `spire:account:<userId>:*`. The account side is only prepared; nothing writes to it.
+  - `src/storage/guestSnapshot.js`: versioned save format with validation (metadata only, never file contents).
+  - `src/storage/latestWriter.js`: one write at a time; only the newest pending value is written.
+  - `src/storage/restore.js`: pure start-up restore decision.
+  - `src/storage/guestStore.js`: AsyncStorage. Unreadable data is backed up under `…:corrupt:<time>`; a read error means read-only mode.
+  - `src/storage/resumeFiles.js`: copies the file into `Paths.document/guest/resume/`; old copies are removed only after the new copy succeeds; existence check.
+  - `src/store/guestPersistence.js`: Redux listener that saves on changes to the profile or resume, plus `restoreGuestData`.
+  - `src/utils/profileMerge.js`: merge rules for a re-uploaded resume.
+  - `tests/storage.test.mjs`, `tests/profileMerge.test.mjs`.
+- **Modified:**
+  - `App.js`: shows a loading state until restore finishes (no flash of an empty profile).
+  - `src/store/index.js`: adds the listener middleware.
+  - `src/store/profileSlice.js`: `storageStatus`, `resumeFileMissing`, `guestDataRestored`; recommendations ignore replies from older requests.
+  - `src/utils/pickResume.js`: `copyToCacheDirectory: false`.
+  - `src/screens/ResumeConfirmScreen.js`: copies first; on failure, an alert, and the existing resume is unchanged.
+  - `src/screens/ProfileConfirmScreen.js`: merges a re-upload into the profile; Skills chip field.
+  - `src/screens/ProfileScreen.js`: Skills row; "File missing — please upload it again"; Download hidden when the file is missing.
+  - `src/screens/ExperienceFormScreen.js`, `EducationFormScreen.js`: `source: 'manual'`.
+  - `src/data/mockResume.js`: sample skills.
+  - `package.json`: two new packages and a `test` script.
+
+### Commands and results
+- `npm test` (Node's built-in test runner; no test framework installed): **25/25 passed**. 24 at first; a 25th was added for bug 3 below. It failed first, then passed after the fix.
+- `npx expo-doctor`: **20/20** (several runs). `npx expo export --platform android`: built (several runs).
+
+### Emulator results (Pixel_5, Expo Go)
+- **D1 First launch** after wiping Expo Go's data: empty guest, "Build your profile". ✅
+- **D2 Restart:** resume flow plus skill "Leadership" plus manual experience, then a full stop and relaunch. Details, 6 skills, experiences, resume (file present) and Recommended (5) were restored. ✅
+- **D3 Edits survive restart:** edited a resume entry to "Frontend Developer II", restarted, and it was still there. ✅
+- **D4 Re-upload:** 5 unique experiences; the edited entry and the manual entry were kept; the skill was kept; only one resume copy left on disk. ✅
+- **D5 Missing file:** deleted the copy with `adb root`, restarted. Profile intact, warning shown, Download hidden, Replace available. ✅
+- **D6 Corrupt data:** set the stored record to `{broken json` with `sqlite3`, restarted. No crash, empty guest, backup key created, expected warning logged. Saving worked afterwards. ✅
+- **Guest namespace on the device:** the AsyncStorage database contained only `spire:guest:data:v1` (plus the corruption backup); no `spire:account:*` keys. ✅
+- **Regression:** All Jobs 120 → "Pune" search gives 12 → Job Details and Apply → map view "View jobs (12)" (in sync) → Recommended with Verified gives 4. ✅
+- **Not checked on the device:**
+  - many quick overlapping saves (unit-tested only)
+  - an AsyncStorage read failure / read-only mode (unit-tested `resolveRestore`, plus code review)
+  - a failed resume copy (code review only; the failure path was seen in the discarded #21 run)
+  - manual education (no way to add it in the UI)
+  - iOS
+
+### Bugs found and fixed
+1. **The copy failed in Expo Go** (`Missing 'READ' permission`).
+   - Cause: the picker's cache copy sits in `cache/DocumentPicker/`, outside the folder Expo Go lets each project read.
+   - Fix: pick without the cache copy and copy straight from the `content://` address, which `expo-file-system`'s permission check allows.
+2. **A failed copy could replace a good resume.** The earlier design continued with the temporary file. Now nothing changes on failure: an alert, and the existing resume is kept.
+3. **Duplicate entry IDs on re-upload.** Editing a resume entry keeps its ID and marks it manual, so a re-upload brought back a resume entry with the same ID (a duplicate row with broken edit and delete). A test reproduced it. Fix: a manual entry wins over an incoming resume entry with the same ID. Verified on the device in D4.
+4. **Out-of-order recommendation replies:** an older reply could overwrite a newer one. Fixed by checking each reply belongs to the latest request.
+
+### Not app bugs (checked)
+- "Expo Go isn't responding" right after the data wipe. Android's log: `ANR … executing service host.exp.exponent/.fcm.ExpoFcmMessagingService`, which is Expo Go's own notification service. The app recovered after "Wait".
+
+### Known limitations
+- Read-only mode (storage can't be read) has no message in the UI; saving is just switched off for that session.
+- Manual education can't be added in the UI (Education icons are display-only since #13; there's no "Show all").
+- Recommendations aren't saved; they're reloaded from the mock after restore.
+- After corruption recovery, the next save overwrites the broken record; the backup copy stays.
