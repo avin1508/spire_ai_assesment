@@ -11,8 +11,23 @@ import {
 import { colors, radius, spacing } from '../theme';
 
 // "All Filters" sheet. Edits a draft copy of the filters; "Show N jobs"
-// applies it. `countFor(draft)` returns how many jobs the draft would show.
-export default function FilterSheet({ visible, jobs, filters, countFor, onApply, onClose }) {
+// applies it. Two ways to supply data:
+//   - local: `jobs` (options/counts derived from them) and `countFor(draft)`
+//   - server: `options` ({ sectionId: [{ value, label, count }] }, null while
+//     `optionsLoading`) and `resultCount` for the current draft (null while
+//     loading), with `onDraftChange(draft)` reporting each edit.
+export default function FilterSheet({
+  visible,
+  jobs,
+  filters,
+  countFor,
+  options,
+  optionsLoading = false,
+  resultCount: serverCount,
+  onDraftChange,
+  onApply,
+  onClose,
+}) {
   const [draft, setDraft] = useState(filters);
   const [expanded, setExpanded] = useState(null);
 
@@ -39,7 +54,12 @@ export default function FilterSheet({ visible, jobs, filters, countFor, onApply,
     });
   };
 
-  const resultCount = countFor(draft);
+  useEffect(() => {
+    if (visible) onDraftChange?.(draft);
+  }, [visible, draft, onDraftChange]);
+
+  const resultCount = countFor ? countFor(draft) : serverCount;
+  const optionsFor = (section) => (jobs ? getSectionOptions(section, jobs) : options?.[section.id] ?? []);
 
   return (
     <BottomSheet
@@ -62,7 +82,9 @@ export default function FilterSheet({ visible, jobs, filters, countFor, onApply,
           style={({ pressed }) => [styles.apply, pressed && styles.pressed]}
         >
           <Text style={styles.applyText}>
-            Show {resultCount} {resultCount === 1 ? 'job' : 'jobs'}
+            {resultCount == null
+              ? 'Show jobs'
+              : `Show ${resultCount} ${resultCount === 1 ? 'job' : 'jobs'}`}
           </Text>
         </Pressable>
       }
@@ -73,7 +95,8 @@ export default function FilterSheet({ visible, jobs, filters, countFor, onApply,
             key={section.id}
             section={section}
             summary={describeSelection(section, draft)}
-            options={getSectionOptions(section, jobs)}
+            options={optionsFor(section)}
+            loading={!jobs && optionsLoading}
             selected={draft[section.id]}
             expanded={expanded === section.id}
             onToggleExpanded={() =>
@@ -91,6 +114,7 @@ function FilterSection({
   section,
   summary,
   options,
+  loading,
   selected,
   expanded,
   onToggleExpanded,
@@ -135,7 +159,9 @@ function FilterSection({
               />
             </View>
           )}
-          {visibleOptions.length === 0 ? (
+          {loading ? (
+            <Text style={styles.empty}>Loading…</Text>
+          ) : visibleOptions.length === 0 ? (
             <Text style={styles.empty}>No options</Text>
           ) : (
             visibleOptions.map((option) => {

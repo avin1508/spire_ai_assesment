@@ -4,15 +4,21 @@ import BottomSheet from './BottomSheet';
 import { colors, spacing } from '../theme';
 
 // "View companies": companies in the current results with their job counts.
-export default function CompanySheet({ visible, jobs, onSelect, onClose }) {
-  const counts = new Map();
-  jobs.forEach((job) => counts.set(job.companyName, (counts.get(job.companyName) ?? 0) + 1));
-  const companies = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+// `companies` is [{ value, count }] from the server (count desc), or null
+// while loading; `error` + `onRetry` when it couldn't be loaded.
+export default function CompanySheet({ visible, companies, error, onRetry, onSelect, onClose }) {
+  const title = companies ? `Companies (${companies.length})` : 'Companies';
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} title={`Companies (${companies.length})`}>
+    <BottomSheet visible={visible} onClose={onClose} title={title}>
       <ScrollView>
-        {companies.map(([name, count]) => (
+        {!companies && !error && <Text style={styles.status}>Loading…</Text>}
+        {!companies && error && (
+          <Pressable onPress={onRetry} accessibilityRole="button">
+            <Text style={styles.status}>Couldn't load companies. Tap to retry.</Text>
+          </Pressable>
+        )}
+        {companies?.map(({ value: name, count }) => (
           <Pressable
             key={name}
             onPress={() => onSelect(name)}
@@ -35,6 +41,12 @@ export default function CompanySheet({ visible, jobs, onSelect, onClose }) {
 }
 
 const styles = StyleSheet.create({
+  status: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    fontSize: 14,
+    color: colors.textMuted,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

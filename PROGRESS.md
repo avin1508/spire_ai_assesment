@@ -81,10 +81,15 @@ The core assessment requirements come first. Other features must not break them.
   - `docker-compose.prod.yml` (project `spire-ai-prod`): Redis with a password, not published, persisted with AOF; read-only backend filesystem; restart always; memory limits; log rotation.
   - The development setup now uses `Dockerfile.dev` (nodemon, `./src` mounted). The old `Dockerfile` was replaced.
 
+- [x] **All Jobs API + integration** (Prompt #29):
+  - **Backend:** `/api/jobs` (list, page/limit/total/hasMore), `/api/jobs/map` (MongoDB grid clustering per zoom), `/api/jobs/summary`, `/api/jobs/filter-options`, `/api/jobs/:jobId`, with validation and 400/404/503 JSON errors.
+  - **Frontend:** All Jobs uses the API (no mock fallback): map viewport events, server clusters, infinite scroll, details by id, and map/list shimmer.
+  - **Tests:** backend 55, frontend 20.
+
 ### In progress
+- [ ] Review of the All Jobs API integration (Prompt #29)
 - [ ] Review of the Docker + Redis setup (Prompts #26–#27)
 - [ ] Review of the Job model refactor and 500-job seed (Prompt #24)
-- [ ] Jobs API (list/search/filter/sort, details, map) — not started; waiting for approval
 - [ ] Review of Prompts #14–#15
 - [ ] Finish verifying Prompt #14: pin preview, list view, search and filters on the map, current location
 
@@ -142,6 +147,11 @@ The core assessment requirements come first. Other features must not break them.
 | 2026-10-24 | Backend `npm test` (Prompt #27) | Passed: 22/22 |
 | — | iOS device or simulator | **Not tested** (no macOS available) |
 | — | Physical Android device | **Not tested** |
+| 2026-10-24 | Backend `npm test` (Prompt #29) | Passed: 55/55, including 33 API integration tests on in-memory MongoDB with the 500-job dataset |
+| 2026-10-24 | Frontend `npm test` (Prompt #29) | Passed: 20/20 (loading/shimmer rules, stale responses, paging, params) |
+| 2026-10-24 | `expo export --platform android`, `expo-doctor` (Prompt #29) | Passed: bundle built; 20/20 |
+| 2026-10-24 | Real API against Atlas (read-only, Prompt #29) | Passed: list 500 / 25 pages, map zoom 5 → clusters totalling 500, last24h total 13, details, 400/404 errors, distance sort |
+| 2026-10-24 | Emulator, All Jobs with the real API (Prompt #29) | Passed: <ul><li>cold-start skeleton (chip pills, dots pill, bottom pill)</li><li>dots + bottom skeleton during zoom with markers kept</li><li>map error pill + retry</li><li>Hyderabad cluster: "50 jobs in this area · 30 companies", then View list showing exactly 50</li><li>Show all → 500 with infinite scroll, footer shimmer, next-page error + retry (re-requested page 4 only)</li><li>Job Details: description skeleton, then API sections</li><li>Last 24 hours chip → View jobs (13)</li><li>All Filters real counts (Pune 45 → Show 45 jobs → map fit to Pune)</li></ul> |
 | — | Linting | **Not available**: no ESLint config in the project; none added to avoid extra dependencies |
 
 ## Known issues
@@ -166,6 +176,11 @@ The core assessment requirements come first. Other features must not break them.
 - Prompt #24: the app still uses its local 120 mock jobs. The 500 seeded jobs appear only once the Jobs API exists.
 
 - Prompt #27: the production Compose setup is single-host with no HTTPS or reverse proxy; one is needed before exposing port 5000 to the internet. The Redis password is visible to anyone who can run `docker inspect` on that host (environment variables). Development Redis has no persistence.
+
+- Prompt #29: grid clustering can draw neighbouring clusters overlapping when their jobs sit near a cell edge (seen at Mumbai/Pune at zoom 5 and inside Pune at zoom 11). Counts and View list stay exact. Fixing it needs a merge step or point-based clustering (decision pending).
+- Prompt #29: "Last 24 hours" uses the stored `postedAt`; it already shows 13 and will drop to 0 as the seed ages. The dates are not changed.
+- Prompt #29: the app defaults to `http://10.0.2.2:5000`. A backend process started before Prompt #29 must be restarted to serve `/api/jobs`.
+- Prompt #29: the guest-storage unit tests from Phase A (Prompt #22) are not in the repository (never committed); `frontend/tests` now holds only the All Jobs tests.
 
 ## Remaining assessment deliverables
 - [ ] Source repository with regular Git commits (5 commits so far; Prompt #7 changes not yet committed)

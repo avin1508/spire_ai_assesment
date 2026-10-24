@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,20 +14,29 @@ import Button from '../components/Button';
 import SortSheet from '../components/SortSheet';
 import FilterSheet from '../components/FilterSheet';
 import CompanySheet from '../components/CompanySheet';
-import { ALL_JOBS } from '../data/mockJobs';
-import { filterOptions } from '../data/mockMap';
+import Skeleton, { JobListItemSkeleton, LoadingDots } from '../components/Skeleton';
+import useRemoteData from '../hooks/useRemoteData';
+import useJobList from '../hooks/useJobList';
+import useDebouncedValue from '../hooks/useDebouncedValue';
 import {
-  EMPTY_FILTERS,
-  countActiveFilters,
-  filterJobs,
-  isSortAvailable,
-  sortJobs,
-} from '../utils/jobFilters';
+  fetchFilterOptions,
+  fetchJob,
+  fetchJobMap,
+  fetchJobSummary,
+} from '../services/jobsService';
+import { filterOptions } from '../data/mockMap';
+import { EMPTY_FILTERS, countActiveFilters, filterJobs, isSortAvailable } from '../utils/jobFilters';
+import { bboxParam, buildFilterParams, paramsKey } from '../utils/jobQueryParams';
+import { loadingView } from '../utils/remoteData';
 import { distanceKm } from '../utils/geo';
 import { colors, radius, shadow, spacing } from '../theme';
 
-// "All Jobs" tab: interactive map + list over the same (mock) job dataset.
-// Search, chips and the filter / sort sheets drive both views.
+const SEARCH_DEBOUNCE_MS = 300;
+const VIEWPORT_DEBOUNCE_MS = 250;
+
+// "All Jobs" tab: interactive map + list over the backend All Jobs API.
+// Search, chips and the filter / sort sheets drive both views; the server
+// filters, sorts, paginates and clusters (see backend/src/routes/jobs.routes.js).
 export default function OpportunitiesScreen() {
   const navigation = useNavigation();
   const mapRef = useRef(null);
@@ -40,52 +49,114 @@ export default function OpportunitiesScreen() {
   const [sortBy, setSortBy] = useState('recommended');
   const [openSheet, setOpenSheet] = useState(null); // 'filters' | 'sort' | 'companies' | null
   const [selectedJobId, setSelectedJobId] = useState(null);
-  const [clusterIds, setClusterIds] = useState(null); // ids in the tapped cluster
-  const [areaIds, setAreaIds] = useState(null); // list restricted to a map cluster
+  const [selectedCluster, setSelectedCluster] = useState(null); // tapped cluster or company office
+  const [areaBounds, setAreaBounds] = useState(null); // list restricted to a map cluster / office
+  const [areaCompany, setAreaCompany] = useState(null); // ...and to the office's company
+  const [viewport, setViewport] = useState(null); // { bbox, zoom } of the visible map
+  const [draftFilters, setDraftFilters] = useState(null); // All Filters sheet draft
   const [userLocation, setUserLocation] = useState(null);
   const [overlayHeight, setOverlayHeight] = useState(0);
 
-  // Add distance from the user once their location is known.
-  const jobs = useMemo(
-    () =>
-      userLocation
-        ? ALL_JOBS.map((job) => ({
-            ...job,
-            distanceKm: distanceKm(userLocation.lat, userLocation.lng, job.latitude, job.longitude),
-          }))
-        : ALL_JOBS,
-    [userLocation]
-  );
-
-  const filtered = useMemo(
-    () => filterJobs(jobs, { query, verifiedOnly, last24h, filters }),
-    [jobs, query, verifiedOnly, last24h, filters]
-  );
-
-  const listJobs = useMemo(() => {
-    const scoped = areaIds ? filtered.filter((job) => areaIds.includes(job.id)) : filtered;
-    return sortJobs(scoped, sortBy);
-  }, [filtered, areaIds, sortBy]);
-
-  const selectedJob = selectedJobId ? jobs.find((job) => job.id === selectedJobId) : null;
+  const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
   const activeFilterCount = countActiveFilters(filters);
 
-  // When the results change, drop the cluster card and any selection that was filtered out.
+  // Search + chips + sheet filters as API parameters (shared by map, list and counts).
+  const filterParams = useMemo(
+    () => buildFilterParams({ query: debouncedQuery, verifiedOnly, last24h, filters }),
+    [debouncedQuery, verifiedOnly, last24h, filters]
+  );
+  const filterKey = paramsKey(filterParams);
+
+  // Map markers for the visible area.
+  const mapParams = useMemo(
+    () => viewport && { ...filterParams, bbox: bboxParam(viewport.bbox), zoom: viewport.zoom },
+    [filterParams, viewport]
+  );
+  const mapKey = viewMode === 'map' && mapParams ? paramsKey(mapParams) : null;
+  const map = useRemoteData(fetchJobMap, mapParams, mapKey, { debounceMs: VIEWPORT_DEBOUNCE_MS });
+  const mapLoading = loadingView(map, mapKey);
+
+  // Total and extent of all matching jobs ("View jobs (N)", fit to results).
+  const summary = useRemoteData(fetchJobSummary, filterParams, filterKey);
+  const summaryLoading = loadingView(summary, filterKey);
+  const jobCount = summary.dataKey === filterKey ? summary.data.total : null;
+  const companyCount = summary.dataKey === filterKey ? summary.data.companyCount : null;
+
+  // List (infinite scroll), restricted to a cluster's area after "View list".
+  const listParams = useMemo(
+    () => ({
+      ...filterParams,
+      sort: sortBy,
+      ...(userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : {}),
+      ...(areaBounds ? { bbox: bboxParam(areaBounds) } : {}),
+      ...(areaCompany ? { company: [areaCompany] } : {}),
+    }),
+    [filterParams, sortBy, userLocation, areaBounds, areaCompany]
+  );
+  const list = useJobList(listParams, { enabled: viewMode === 'list' });
+
+  // Preview card for a tapped job marker.
+  const selected = useRemoteData(fetchJob, selectedJobId, selectedJobId, { enabled: Boolean(selectedJobId) });
+  const selectedJob = useMemo(() => {
+    if (!selectedJobId || selected.dataKey !== selectedJobId) return null;
+    const job = selected.data;
+    return userLocation
+      ? { ...job, distanceKm: distanceKm(userLocation.lat, userLocation.lng, job.latitude, job.longitude) }
+      : job;
+  }, [selectedJobId, selected.data, selected.dataKey, userLocation]);
+
+  // All Filters sheet: options with counts over all jobs, and the draft's result count.
+  const filterSheetOpen = openSheet === 'filters';
+  const options = useRemoteData(fetchFilterOptions, {}, filterSheetOpen ? 'all' : null);
+  const draftParams = useMemo(
+    () => buildFilterParams({ query: debouncedQuery, verifiedOnly, last24h, filters: draftFilters ?? filters }),
+    [debouncedQuery, verifiedOnly, last24h, draftFilters, filters]
+  );
+  const draftKey = filterSheetOpen ? paramsKey(draftParams) : null;
+  const draftSummary = useRemoteData(fetchJobSummary, draftParams, draftKey, { debounceMs: 200 });
+  const draftCount = draftKey !== null && draftSummary.dataKey === draftKey ? draftSummary.data.total : null;
+  const handleDraftChange = useCallback((draft) => setDraftFilters(draft), []);
+
+  // "View companies": companies within the current results.
+  const companiesOpen = openSheet === 'companies';
+  const companyOptions = useRemoteData(fetchFilterOptions, filterParams, companiesOpen ? filterKey : null);
+  const companies =
+    companiesOpen && companyOptions.dataKey === filterKey ? companyOptions.data.sections.company : null;
+
+  // When the results change, drop the cluster card and any selection that is
+  // filtered out. Runs only on filter changes (the other values are read as-is).
+  const selectedJobRef = useRef(null);
+  selectedJobRef.current = selectedJob;
+  const firstFilterKey = useRef(true);
   useEffect(() => {
-    setClusterIds(null);
-    setSelectedJobId((id) => (id && filtered.some((job) => job.id === id) ? id : null));
-  }, [filtered]);
+    if (firstFilterKey.current) {
+      firstFilterKey.current = false;
+      return;
+    }
+    setSelectedCluster(null);
+    setSelectedJobId((id) => {
+      const job = selectedJobRef.current;
+      if (!id || !job) return null;
+      const stillMatches =
+        filterJobs([job], { query: debouncedQuery, verifiedOnly, last24h, filters }).length > 0;
+      return stillMatches ? id : null;
+    });
+  }, [filterKey]);
 
   // Fit the map to the results when the search or sheet filters change.
+  const fitKey = paramsKey(buildFilterParams({ query: debouncedQuery, filters }));
+  const lastFitKey = useRef(fitKey);
   useEffect(() => {
-    if (query === '' && activeFilterCount === 0) return undefined;
-    const timer = setTimeout(() => mapRef.current?.fitToJobs(), 500);
-    return () => clearTimeout(timer);
-  }, [query, filters, activeFilterCount]);
+    if (fitKey === lastFitKey.current || summary.dataKey !== filterKey) return;
+    lastFitKey.current = fitKey;
+    if (debouncedQuery === '' && activeFilterCount === 0) return;
+    if (summary.data.bounds) mapRef.current?.fitToBounds(summary.data.bounds);
+  }, [summary.data, summary.dataKey, filterKey, fitKey, debouncedQuery, activeFilterCount]);
 
   const openDetails = (job) =>
     navigation.navigate('JobDetails', {
       job: { ...job, location: `${job.area}, ${job.city}` },
+      jobId: job.id,
     });
 
   const locate = async () => {
@@ -115,68 +186,140 @@ export default function OpportunitiesScreen() {
   const chipSelected = (id) =>
     (id === 'verified' && verifiedOnly) || (id === 'last24h' && last24h);
 
-  const showList = (ids = null) => {
-    setAreaIds(ids);
-    setClusterIds(null);
+  const showList = (bounds = null, company = null) => {
+    setAreaBounds(bounds);
+    setAreaCompany(company);
+    setSelectedCluster(null);
     setSelectedJobId(null);
     setViewMode('list');
+  };
+
+  const clearAll = () => {
+    setQuery('');
+    setVerifiedOnly(false);
+    setLast24h(false);
+    setFilters(EMPTY_FILTERS);
+    setAreaBounds(null);
+    setAreaCompany(null);
+  };
+
+  const handleViewportChange = useCallback((next) => setViewport(next), []);
+
+  // Distance needs the user's location; fitment needs fit data (All Jobs has none).
+  const sortAvailable = (sortId) => {
+    if (sortId === 'distance') return Boolean(userLocation);
+    if (sortId === 'fitment') return isSortAvailable(sortId, list.items);
+    return true;
+  };
+
+  const showMapSkeleton = viewMode === 'map' && mapLoading.initialSkeleton;
+  const showBottomSkeleton = mapLoading.loadingIndicator || mapLoading.initialSkeleton || summaryLoading.loadingIndicator;
+
+  const renderListHeader = () => (
+    <View style={styles.listHeader}>
+      {list.total == null ? (
+        <Skeleton width={90} height={14} borderRadius={radius.sm} />
+      ) : (
+        <Text style={styles.listCount}>
+          {list.total} {list.total === 1 ? 'job' : 'jobs'}
+          {areaBounds ? ' in the selected map area' : ''}
+        </Text>
+      )}
+      {areaBounds && (
+        <Pressable
+          onPress={() => {
+            setAreaBounds(null);
+            setAreaCompany(null);
+          }}
+          accessibilityRole="button"
+          hitSlop={8}
+        >
+          <Text style={styles.link}>Show all</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+
+  const renderListEmpty = () => {
+    if (list.firstPageLoading) {
+      return (
+        <>
+          {[0, 1, 2].map((index) => (
+            <JobListItemSkeleton key={index} style={styles.listItem} />
+          ))}
+        </>
+      );
+    }
+    if (list.firstPageError) {
+      return (
+        <View style={styles.empty}>
+          <Text style={styles.emptyTitle}>Couldn't load jobs</Text>
+          <Text style={styles.emptyText}>{list.error?.message}</Text>
+          <Button label="Try again" variant="outline" onPress={list.retry} />
+        </View>
+      );
+    }
+    if (!list.empty) return null;
+    return (
+      <View style={styles.empty}>
+        <Text style={styles.emptyTitle}>No jobs match your search</Text>
+        <Button label="Clear filters" variant="outline" onPress={clearAll} />
+      </View>
+    );
+  };
+
+  const renderListFooter = () => {
+    if (list.nextPageLoading) {
+      return (
+        <>
+          {[0, 1].map((index) => (
+            <JobListItemSkeleton key={index} style={styles.listItem} />
+          ))}
+        </>
+      );
+    }
+    if (list.nextPageError) {
+      return (
+        <Pressable onPress={list.retry} accessibilityRole="button" style={styles.footerError}>
+          <Text style={styles.footerErrorText}>Couldn't load more jobs. Tap to retry.</Text>
+        </Pressable>
+      );
+    }
+    return null;
   };
 
   return (
     <View style={styles.container}>
       <JobsMap
         ref={mapRef}
-        jobs={filtered}
+        markers={map.data}
         selectedJobId={selectedJobId}
+        onViewportChange={handleViewportChange}
         onJobPress={(id) => {
-          setClusterIds(null);
+          setSelectedCluster(null);
           setSelectedJobId(id);
         }}
-        onClusterPress={(ids) => {
+        onClusterPress={(cluster) => {
           setSelectedJobId(null);
-          setClusterIds(ids);
+          setSelectedCluster(cluster);
         }}
         onMapPress={() => {
           setSelectedJobId(null);
-          setClusterIds(null);
+          setSelectedCluster(null);
         }}
       />
 
       {viewMode === 'list' && (
         <FlatList
           style={styles.list}
-          data={listJobs}
+          data={list.items}
           keyExtractor={(job) => job.id}
           contentContainerStyle={[styles.listContent, { paddingTop: overlayHeight + spacing.sm }]}
-          ListHeaderComponent={
-            <View style={styles.listHeader}>
-              <Text style={styles.listCount}>
-                {listJobs.length} {listJobs.length === 1 ? 'job' : 'jobs'}
-                {areaIds ? ' in the selected map area' : ''}
-              </Text>
-              {areaIds && (
-                <Pressable onPress={() => setAreaIds(null)} accessibilityRole="button" hitSlop={8}>
-                  <Text style={styles.link}>Show all</Text>
-                </Pressable>
-              )}
-            </View>
-          }
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>No jobs match your search</Text>
-              <Button
-                label="Clear filters"
-                variant="outline"
-                onPress={() => {
-                  setQuery('');
-                  setVerifiedOnly(false);
-                  setLast24h(false);
-                  setFilters(EMPTY_FILTERS);
-                  setAreaIds(null);
-                }}
-              />
-            </View>
-          }
+          onEndReached={list.loadMore}
+          onEndReachedThreshold={0.5}
+          ListHeaderComponent={renderListHeader()}
+          ListEmptyComponent={renderListEmpty()}
+          ListFooterComponent={renderListFooter()}
           renderItem={({ item }) => (
             <JobListItem job={item} onPress={() => openDetails(item)} style={styles.listItem} />
           )}
@@ -203,39 +346,65 @@ export default function OpportunitiesScreen() {
           contentContainerStyle={styles.chipsContent}
           keyboardShouldPersistTaps="handled"
         >
-          <FilterChip
-            icon="options-outline"
-            accessibilityLabel={
-              activeFilterCount > 0 ? `All filters, ${activeFilterCount} active` : 'All filters'
-            }
-            selected={activeFilterCount > 0}
-            onPress={() => setOpenSheet('filters')}
-          />
-          {viewMode === 'list' && (
-            <FilterChip
-              label="Sort"
-              icon="swap-vertical"
-              iconColor={colors.text}
-              selected={sortBy !== 'recommended'}
-              onPress={() => setOpenSheet('sort')}
-            />
+          {showMapSkeleton ? (
+            <>
+              <Skeleton width={40} height={34} borderRadius={10} style={styles.chipSkeleton} />
+              <Skeleton width={120} height={34} style={styles.chipSkeleton} />
+              <Skeleton width={92} height={34} style={styles.chipSkeleton} />
+              <Skeleton width={118} height={34} style={styles.chipSkeleton} />
+            </>
+          ) : (
+            <>
+              <FilterChip
+                icon="options-outline"
+                accessibilityLabel={
+                  activeFilterCount > 0 ? `All filters, ${activeFilterCount} active` : 'All filters'
+                }
+                selected={activeFilterCount > 0}
+                onPress={() => setOpenSheet('filters')}
+              />
+              {viewMode === 'list' && (
+                <FilterChip
+                  label="Sort"
+                  icon="swap-vertical"
+                  iconColor={colors.text}
+                  selected={sortBy !== 'recommended'}
+                  onPress={() => setOpenSheet('sort')}
+                />
+              )}
+              {filterOptions.map((filter) => (
+                <FilterChip
+                  key={filter.id}
+                  label={filter.label}
+                  icon={filter.icon}
+                  iconColor={filter.iconColor}
+                  dot={filter.dot}
+                  selected={chipSelected(filter.id)}
+                  onPress={() => toggleChip(filter.id)}
+                />
+              ))}
+            </>
           )}
-          {filterOptions.map((filter) => (
-            <FilterChip
-              key={filter.id}
-              label={filter.label}
-              icon={filter.icon}
-              iconColor={filter.iconColor}
-              dot={filter.dot}
-              selected={chipSelected(filter.id)}
-              onPress={() => toggleChip(filter.id)}
-            />
-          ))}
         </ScrollView>
       </View>
 
       {viewMode === 'map' && (
         <>
+          <View style={[styles.mapStatus, { top: overlayHeight + spacing.md }]} pointerEvents="box-none">
+            {mapLoading.loadingIndicator || mapLoading.initialSkeleton ? (
+              <LoadingDots />
+            ) : mapLoading.errorRetry ? (
+              <Pressable
+                onPress={map.retry}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.mapError, pressed && styles.pressed]}
+              >
+                <Ionicons name="refresh" size={16} color={colors.primary} />
+                <Text style={styles.mapErrorText}>Couldn't load jobs. Tap to retry.</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
           <MapControls
             style={styles.mapControls}
             onZoomIn={() => mapRef.current?.zoomIn()}
@@ -252,55 +421,85 @@ export default function OpportunitiesScreen() {
                 style={styles.previewCard}
               />
             </View>
-          ) : clusterIds ? (
+          ) : selectedCluster ? (
             <View style={[styles.preview, styles.clusterCard]}>
               <View style={styles.clusterText}>
-                <Text style={styles.clusterTitle}>{clusterIds.length} jobs in this area</Text>
-                <Text style={styles.clusterSub}>
-                  {new Set(jobs.filter((job) => clusterIds.includes(job.id)).map((job) => job.companyName)).size}{' '}
-                  companies
-                </Text>
+                {selectedCluster.companyName ? (
+                  <>
+                    <Text style={styles.clusterTitle} numberOfLines={1}>
+                      {selectedCluster.count} jobs at {selectedCluster.companyName}
+                    </Text>
+                    <Text style={styles.clusterSub} numberOfLines={1}>
+                      {selectedCluster.area}, {selectedCluster.city}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.clusterTitle}>{selectedCluster.count} jobs in this area</Text>
+                    <Text style={styles.clusterSub}>{selectedCluster.companyCount} companies</Text>
+                  </>
+                )}
               </View>
               <Button
                 label="Zoom in"
                 variant="outline"
                 onPress={() => {
-                  mapRef.current?.zoomToLastCluster();
-                  setClusterIds(null);
+                  mapRef.current?.zoomToBounds(selectedCluster.bounds);
+                  setSelectedCluster(null);
                 }}
                 style={styles.clusterButton}
               />
-              <Button label="View list" onPress={() => showList(clusterIds)} style={styles.clusterButton} />
+              <Button
+                label="View list"
+                onPress={() => showList(selectedCluster.bounds, selectedCluster.companyName ?? null)}
+                style={styles.clusterButton}
+              />
             </View>
           ) : (
             <>
               <AgentSigmaButton style={styles.agentSigma} />
-              <BottomActionBar
-                style={styles.bottomActions}
-                jobCount={filtered.length}
-                onViewCompanies={() => setOpenSheet('companies')}
-                onViewJobs={() => showList()}
-              />
+              {showBottomSkeleton ? (
+                <View style={[styles.bottomActions, styles.bottomSkeletonRow]} pointerEvents="none">
+                  <View style={styles.bottomSkeleton}>
+                    <Skeleton width={20} height={20} borderRadius={6} />
+                    <Skeleton width={96} height={12} />
+                  </View>
+                </View>
+              ) : (
+                <BottomActionBar
+                  style={styles.bottomActions}
+                  jobCount={jobCount}
+                  companyCount={companyCount}
+                  onViewCompanies={() => setOpenSheet('companies')}
+                  onViewJobs={() => showList()}
+                />
+              )}
             </>
           )}
         </>
       )}
 
       <FilterSheet
-        visible={openSheet === 'filters'}
-        jobs={jobs}
+        visible={filterSheetOpen}
         filters={filters}
-        countFor={(draft) => filterJobs(jobs, { query, verifiedOnly, last24h, filters: draft }).length}
+        options={options.dataKey === 'all' ? options.data.sections : null}
+        optionsLoading={!options.hasData}
+        resultCount={draftCount}
+        onDraftChange={handleDraftChange}
         onApply={(draft) => {
           setFilters(draft);
+          setDraftFilters(null);
           setOpenSheet(null);
         }}
-        onClose={() => setOpenSheet(null)}
+        onClose={() => {
+          setDraftFilters(null);
+          setOpenSheet(null);
+        }}
       />
       <SortSheet
         visible={openSheet === 'sort'}
         selected={sortBy}
-        isAvailable={(sortId) => isSortAvailable(sortId, jobs)}
+        isAvailable={sortAvailable}
         onSelect={(sortId) => {
           setSortBy(sortId);
           setOpenSheet(null);
@@ -308,8 +507,10 @@ export default function OpportunitiesScreen() {
         onClose={() => setOpenSheet(null)}
       />
       <CompanySheet
-        visible={openSheet === 'companies'}
-        jobs={filtered}
+        visible={companiesOpen}
+        companies={companies}
+        error={companyOptions.error}
+        onRetry={companyOptions.retry}
         onSelect={(name) => {
           setFilters((current) => ({ ...current, company: [name] }));
           setOpenSheet(null);
@@ -344,6 +545,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },
+  chipSkeleton: {
+    marginRight: spacing.sm,
+  },
+  mapStatus: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  mapError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    height: 36,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    ...shadow,
+  },
+  mapErrorText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  pressed: {
+    opacity: 0.85,
+  },
   mapControls: {
     position: 'absolute',
     right: spacing.md,
@@ -359,6 +587,19 @@ const styles = StyleSheet.create({
     left: spacing.md,
     right: spacing.md,
     bottom: '9%',
+  },
+  bottomSkeletonRow: {
+    alignItems: 'center',
+  },
+  bottomSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    height: 44,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    ...shadow,
   },
   preview: {
     position: 'absolute',
@@ -411,6 +652,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 20,
     marginBottom: spacing.sm,
   },
   listCount: {
@@ -434,5 +676,19 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     color: colors.text,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  footerError: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+  },
+  footerErrorText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
   },
 });

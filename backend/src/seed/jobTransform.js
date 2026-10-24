@@ -157,7 +157,55 @@ export function composeDescription(doc) {
   return parts.join('\n\n');
 }
 
-// Job document → the job shape the frontend uses today (for the future API).
+// Fields a list card / map preview needs (no description sections).
+export const CARD_FIELDS = [
+  'jobId',
+  'title',
+  'category',
+  'companyName',
+  'area',
+  'city',
+  'state',
+  'country',
+  'latitude',
+  'longitude',
+  'experience',
+  'jobType',
+  'postedAt',
+  'salary',
+  'verified',
+  'requiredSkills',
+  'applyUrl',
+];
+
+// Job document (CARD_FIELDS) → the card shape used by the All Jobs list and
+// map preview. Same field mapping as toFrontendJob, without `description`.
+export function toJobCard(doc) {
+  const card = {
+    id: doc.jobId,
+    title: doc.title,
+    category: doc.category,
+    companyName: doc.companyName,
+    company: doc.companyName,
+    area: doc.area,
+    city: doc.city,
+    state: doc.state,
+    country: doc.country,
+    location: `${doc.city}, ${doc.state}`,
+    latitude: doc.latitude,
+    longitude: doc.longitude,
+    experience: doc.experience,
+    jobType: doc.jobType,
+    postedAt: new Date(doc.postedAt).toISOString(),
+    salary: formatSalary(doc.salary),
+    verified: doc.verified,
+    requiredSkills: [...doc.requiredSkills],
+  };
+  if (doc.applyUrl) card.applyUrl = doc.applyUrl;
+  return card;
+}
+
+// Job document → the full job shape the frontend uses (Job Details).
 export function toFrontendJob(doc) {
   const job = {
     id: doc.jobId,

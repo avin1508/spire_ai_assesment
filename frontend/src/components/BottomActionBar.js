@@ -2,10 +2,14 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, shadow, spacing } from '../theme';
 
-export default function BottomActionBar({ jobCount, onViewCompanies, onViewJobs, style }) {
+export default function BottomActionBar({ jobCount, companyCount, onViewCompanies, onViewJobs, style }) {
   return (
     <View style={[styles.container, style]} pointerEvents="box-none">
-      <ActionPill icon="business" label="View companies" onPress={onViewCompanies} />
+      <ActionPill
+        icon="business"
+        label={`View companies${companyCount != null ? ` (${companyCount})` : ''}`}
+        onPress={onViewCompanies}
+      />
       <ActionPill
         icon="briefcase-outline"
         label={`View jobs${jobCount != null ? ` (${jobCount})` : ''}`}

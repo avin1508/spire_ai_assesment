@@ -2259,3 +2259,125 @@ one correction need to if the user will not login na so he can not apply ok add 
 - Single host only; no HTTPS or reverse proxy yet.
 - The Redis password is an environment variable, so anyone with `docker inspect` access on the host can see it. Docker secrets or a secrets manager would be the next step.
 - `restart: always` restarts the production stack whenever Docker starts, until it's taken down.
+
+## Prompts #28 (Part 1) and #28: All Jobs architecture discussion and requirements review (analysis only)
+
+- **Date/time:** 2026-10-24, about 19:30–20:00 IST
+- **AI tool:** Claude
+- **Exact prompts:** "I want to have a detailed technical architecture discussion about a scalability problem…" and "We are preparing to make the existing 'All Jobs' tab fully dynamic… This is a review and requirements-discovery task ONLY."
+- **Read only:** both prompts forbade file changes, so nothing was logged at the time. This entry was added with Prompt #29.
+- **Findings used later:**
+  - the app sent every job to the phone and clustered on the device;
+  - the map had no viewport events;
+  - filter counts were global;
+  - `postedAt` is frozen at seed time;
+  - an API contract with list, details, summary, filter options and map endpoints.
+
+## Prompt #29: All Jobs API development, integration and testing
+
+- **Date/time:** 2026-10-24, about 20:00–22:00 IST
+- **AI tool:** Claude
+- **Exact prompt:** "# Task: Complete All Jobs API Development, Integration & Testing", with two reference screenshots of the map loading state.
+  - Backend endpoints; server-side clustering with MongoDB aggregation; map loading shimmer matching the screenshots; infinite scroll with shimmer; filters, search and sort preserved; Job Details by id; reliability; backend and frontend tests; final verification.
+  - **Rules:** preserve the UI, no AI ranking, don't change `postedAt`, don't touch the 500 records, no secrets in logs.
+
+### Backend
+- **New:**
+  - `src/app.js`: `createApp()`; `server.js` now only connects and listens.
+  - `src/routes/jobs.routes.js`: five GET endpoints; 503 while MongoDB isn't connected.
+  - `src/services/jobQuery.js`: validation (unknown parameters, ranges, enums, repeated scalars, bbox, zoom, job id) and the shared `buildJobFilter`. Search is a literal, case-insensitive regex over title, company, area, city, state and skills.
+  - `src/services/jobs.service.js`:
+    - list via `find` with sort `postedAt -1, _id -1` plus skip/limit, or `$geoNear` for distance;
+    - `countDocuments` for the total;
+    - `$facet` for filter options;
+    - a `$group` grid for map clusters (cell = 360/2^zoom × 64/256 degrees);
+    - every query has an 8 s `maxTimeMS`.
+  - `src/utils/httpErrors.js`, `src/utils/geo.js`, `tests/jobsApi.test.js` (33 tests).
+- **Modified:** `src/seed/jobTransform.js` gains `toJobCard` and `CARD_FIELDS`; `package.json` adds the dev dependency `mongodb-memory-server` ^11.3.0.
+- **bbox matching:** exact latitude/longitude ranges, plus a `$geoWithin` polygon expanded by 0.01° and split into ≤1° segments, so great-circle edges never cut off jobs and the 2dsphere index is used. Tests check edge points and the query plan.
+- **No new indexes.** At 500 documents the existing ones are enough; a compound `{postedAt:-1,_id:-1}` is the first candidate at scale.
+
+### Frontend
+- **New:**
+  - `config/api.js` (`EXPO_PUBLIC_API_URL`);
+  - `services/jobsService.js` (fetch with abort + 15 s timeout, `ApiError`);
+  - hooks `useRemoteData` (latest-only, debounce, keeps old data), `useJobList` (infinite scroll), `useDebouncedValue`;
+  - pure, Node-testable `utils/remoteData.js`, `jobPages.js`, `latestRequest.js`, `jobQueryParams.js`;
+  - `components/Skeleton.js` (pulse skeleton, `LoadingDots`, `JobListItemSkeleton`);
+  - `tests/allJobs.test.mjs` (20 tests).
+- **Modified:**
+  - `JobsMap.js`: markercluster plugin removed (no client clustering); viewport events on `moveend`; `setMarkers` for server clusters and points; `zoomToBounds` / `fitToBounds`. Same pin and cluster styles.
+  - `OpportunitiesScreen.js`: API data for map, summary, list, preview, filter options and companies; cluster card uses the server's count, company count and bounds; "View list" filters by the cluster bounds.
+  - `FilterSheet.js`: optional server options and counts; local mode kept for Recommended.
+  - `CompanySheet.js`: server company counts.
+  - `JobDetailsScreen.js`: fetches by `jobId` when given, merges with the passed card; description skeleton, retry, and "no longer available" for 404.
+  - `errors.js`: `ApiError`. `.env.example`: `EXPO_PUBLIC_API_URL`. `mockMap.js`: comment.
+- **Loading design:**
+  - *Cold start:* skeleton chip pills, dots pill and bottom skeleton pill, as in the reference.
+  - *Later map requests:* dots pill + bottom skeleton; chips and markers stay. Keeping the chips usable is my interpretation of "preserve filter controls".
+  - *Failure:* stops the shimmer and shows a retry pill.
+
+### Verification (actually run)
+- Backend `npm test`: **55/55**. Frontend `npm test`: **20/20**. `expo export --platform android`: built. `expo-doctor`: 20/20.
+- **Real API against Atlas (read-only):** list total 500, page 25 `hasMore:false`; map zoom 5 → clusters totalling 500; summary `verified+last24h` 9; aging counts 13/115/500; details; 400 and 404 responses; distance sort (nearest Bengaluru jobs 1.0–1.5 km).
+- **Emulator** (new backend on a spare port, plus a test-only delaying proxy to make loading states visible):
+  - cold-start skeleton;
+  - zoom → dots pill + bottom skeleton with markers kept;
+  - map 503 → retry pill, shimmer stopped; retry recovered;
+  - Hyderabad cluster → 50 jobs / 30 companies → View list showed exactly 50;
+  - Show all → 500; infinite scroll with footer shimmer; next-page error + retry (re-requested page 4 only);
+  - Job Details skeleton → API description;
+  - Last 24 hours → View jobs (13);
+  - All Filters Pune 45 → Show 45 jobs → map fit to Pune.
+- All test processes were stopped afterwards. The user's own servers on 5000/8081 were not touched.
+
+### Mistakes and fixes
+- `ListEmptyComponent` / `ListFooterComponent` first returned arrays, which FlatList treats as a component type. Wrapped them in fragments before running.
+- A Mongoose 9 pipeline update in a test needed `{ updatePipeline: true }` (1 failing test, fixed).
+- Emulator network throttling didn't reliably slow host traffic, so the shimmer wasn't caught at first. Switched to a scratchpad delaying proxy.
+
+### Limitations
+- Grid clusters can overlap visually at cell edges; the counts stay exact.
+- No AI ranking: "Recommended" is newest-first.
+- Search is a regex scan (fine at 500; at scale use Atlas Search).
+- The `total` count runs on every list page.
+- A backend process started before this prompt must be restarted to serve the API.
+
+## Prompt #30: "Couldn't load jobs" on the map (bug fix)
+
+- **Date/time:** 2026-10-24, about 22:10–22:30 IST
+- **AI tool:** Claude
+- **Exact prompt:** "there is something went wrong can you test again because the dat is is not coming it should couldn't load the job on the map its showing can you check what is the problem here??"
+- **Checked:**
+  - The backend on :5000 (now the Docker dev stack) served `/api/jobs/map` correctly from the computer.
+  - The emulator reached `10.0.2.2:5000` and the app worked there.
+  - The user tests on a **physical phone**.
+- **Root cause (my mistake in Prompt #29):** without `EXPO_PUBLIC_API_URL`, `config/api.js` defaulted to `http://10.0.2.2:5000` on every Android device. That address only exists inside the emulator, so on a real phone every API request failed, and the map showed the retry pill.
+- **Fix:** `config/api.js` now takes the host from the Expo dev server the app was loaded from (`expo-constants` `expoConfig.hostUri`, e.g. 10.113.98.185:8081 → :5000). `localhost`/127.0.0.1 becomes 10.0.2.2 on Android. `EXPO_PUBLIC_API_URL` still overrides. `expo-constants` ~58.0.13 was added to `package.json` via `expo install` (it was already installed through Expo).
+- **Verified:**
+  - backend health on the Wi-Fi address 10.113.98.185:5000;
+  - Windows Firewall allows "Docker Desktop Backend" on the Public (Wi-Fi) profile;
+  - app loaded on the emulator from `exp://10.113.98.185:8081` (the phone's path) → View jobs (500), no error;
+  - loaded from `exp://127.0.0.1:8081` → also works;
+  - frontend tests 20/20, `expo-doctor` 20/20, Android export built.
+  - Not verified on the physical phone itself (no access).
+
+## Prompts #31–#32: Map markers like the reference (company bubbles + numbered pins)
+
+- **Date/time:** 2026-10-24, about 22:30–23:15 IST
+- **AI tool:** Claude
+- **Exact prompts:** "can you show the jobs like this that is more menaing full did you get what i am trying to tell ??" (screenshot), then "no you missunderstood you understood wrong that we need to show when we are doing the zoom … now are you able to understood" (two screenshots).
+- **First attempt (Prompt #31, my mistake):** I made every marker a white bubble labelled with the cluster's top company ("Bluepeak Labs +19 more"). The user reverted it. The reference actually has two kinds of marker that change with zoom: blue numbered pins for groups, and white company bubbles (briefcase + job count + company name) for single offices.
+- **Implemented (Prompt #32):**
+  - `getMapData` groups jobs per (cell, company + area + city), then per cell. One office → `offices[]` (count, companyName, area, city, bounds, jobId when 1 job); several → `clusters[]` (officeCount, companyCount, bounds).
+  - The points mode and `mode` field were removed.
+  - `/summary` returns `companyCount`.
+  - **Frontend:**
+    - `JobsMap` draws blue numbered pins and white company bubbles; a one-job office opens the job preview, and a selected bubble turns blue.
+    - The office card shows "N jobs at Company · Area, City", and "View list" filters by bbox + company.
+    - "View companies (N)" now shows the count.
+- **Verified:**
+  - backend `npm test` 56/56: every marker is checked against an independent grouping at zoom 6/9/12/15; zooming splits clusters; "View list" exactness for clusters and offices; summary `companyCount`;
+  - frontend `npm test` 20/20; Android export built;
+  - on the emulator: India view shows numbered pins (Bengaluru 69) with "View companies (30)" / "View jobs (500)"; the Bengaluru card "70 jobs in this area · 30 companies"; zoom in → smaller pins and bubbles such as "1 Granite Insurance".
+- **Note:** with the demo dataset most company offices have 1 job, so bubbles often show "1". Real data with many jobs per office gives larger counts, like the reference.

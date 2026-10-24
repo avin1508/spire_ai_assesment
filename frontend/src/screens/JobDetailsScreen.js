@@ -5,19 +5,39 @@ import { useSelector } from 'react-redux';
 import { FIT_STYLES, LockableIcon } from '../components/JobCard';
 import { selectIsGuest } from '../store/sessionSlice';
 import useRequireAuth from '../hooks/useRequireAuth';
+import Skeleton from '../components/Skeleton';
+import useRemoteData from '../hooks/useRemoteData';
+import { fetchJob } from '../services/jobsService';
 import { formatPostedAge } from '../utils/format';
 import { parseDescription } from '../utils/parseDescription';
+import { loadingView } from '../utils/remoteData';
 import { colors, radius, spacing } from '../theme';
 
 // Full-screen details for the job passed in `route.params.job`.
+// When `route.params.jobId` is given (All Jobs), the full job is loaded from
+// the backend; the passed job is shown meanwhile. Fit and skill-match fields
+// only ever come from the passed job (the jobs API has none).
 // Guests see lock badges on email / save / apply and are asked to sign up.
 export default function JobDetailsScreen({ navigation, route }) {
-  const { job } = route.params;
+  const { job: passedJob, jobId = null } = route.params;
+  const details = useRemoteData(fetchJob, jobId, jobId);
+  const detailsView = loadingView(details, jobId);
+  const loaded = jobId !== null && details.dataKey === jobId ? details.data : null;
+  const job = loaded
+    ? {
+        ...passedJob,
+        ...loaded,
+        // Keep the "Area, City" location the list showed.
+        location: passedJob?.location ?? `${loaded.area}, ${loaded.city}`,
+      }
+    : passedJob ?? {};
+  const notFound = details.error?.status === 404;
+
   const insets = useSafeAreaInsets();
   const isGuest = useSelector(selectIsGuest);
   const { openLogin } = useRequireAuth();
   // After sign-in, come back to this job.
-  const promptSignUp = () => openLogin({ name: 'JobDetails', params: { job } });
+  const promptSignUp = () => openLogin({ name: 'JobDetails', params: { job: passedJob, jobId } });
 
   const matched = job.matchedSkills ?? [];
   const gaps = job.gapSkills ?? [];
@@ -183,7 +203,21 @@ export default function JobDetailsScreen({ navigation, route }) {
         )}
 
         <Text style={[styles.sectionTitle, styles.descriptionTitle]}>Job Description</Text>
-        {blocks.length === 0 ? (
+        {jobId !== null && !loaded && !detailsView.errorRetry ? (
+          <View accessibilityLabel="Loading job description">
+            {['92%', '100%', '85%', '96%', '70%'].map((width, index) => (
+              <Skeleton key={index} width={width} height={14} borderRadius={radius.sm} style={styles.lineSkeleton} />
+            ))}
+          </View>
+        ) : jobId !== null && !loaded && notFound ? (
+          <Text style={styles.muted}>This job is no longer available.</Text>
+        ) : jobId !== null && !loaded ? (
+          <Pressable onPress={details.retry} accessibilityRole="button">
+            <Text style={styles.muted}>
+              Couldn't load the full job details. <Text style={styles.retryText}>Tap to retry.</Text>
+            </Text>
+          </Pressable>
+        ) : blocks.length === 0 ? (
           <Text style={styles.muted}>No description was provided for this job.</Text>
         ) : (
           blocks.map((block, index) => {
@@ -242,6 +276,13 @@ export default function JobDetailsScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  lineSkeleton: {
+    marginBottom: spacing.sm,
+  },
+  retryText: {
+    fontWeight: '600',
+    color: colors.primary,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.surface,
