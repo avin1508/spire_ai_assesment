@@ -1961,3 +1961,195 @@ one correction need to if the user will not login na so he can not apply ok add 
 - Manual education can't be added in the UI (Education icons are display-only since #13; there's no "Show all").
 - Recommendations aren't saved; they're reloaded from the mock after restore.
 - After corruption recovery, the next save overwrites the broken record; the backup copy stays.
+
+---
+
+## Prompt #23: MongoDB Job schema and seed of the 120 frontend jobs
+
+- **Date/time:** 2026-10-24, about 16:15–16:40 IST
+- **AI tool:** Claude
+- **Exact prompt:** the "# Task: Build MongoDB Job Schema and Seed Existing Frontend Jobs" message (Step 1 inspect the frontend; Step 2 schema; Step 3 idempotent seed; Step 4 Atlas configuration with credentials from `.env`; Step 5 compatibility; scope: model, connection, conversion, seed, tests, docs only).
+
+### What was inspected in the frontend (and what it showed)
+- **`src/data/mockJobs.js` (`ALL_JOBS`):**
+  - 120 records with 18 fields, none optional. IDs are unique, `job-<city>-<n>`.
+  - `experience` has 5 values, `jobType` 3, `salary` 5 display strings; `country` is always India; 9 states, 10 cities, 14 titles, 16 companies, 60 areas, 34 skills.
+  - `company` always equals `companyName`, and `location` always equals `city + ", " + state`.
+  - `postedAt` is generated relative to load time.
+- **`utils/jobFilters.js`:**
+  - Search covers title, company, area, location and the skill lists.
+  - Filters: country, location (the city part of `location`), company, experience, title, aging (24h/7d/30d from `postedAt`), state (the state part of `location`), plus the Verified and Last 24 hours chips.
+  - Sorts: recommended (no change), newest (`postedAt`), fitment (`fitLabel`), distance (`distanceKm` from the user's location).
+- **`OpportunitiesScreen.js`, `JobsMap.js`, `JobListItem.js`, `CompanySheet.js`:**
+  - Map markers use `id`, `latitude` and `longitude`.
+  - List cards show `area`, `city`, `experience`, `jobType`, `salary`, `requiredSkills` and `postedAt`.
+  - Company counts use `companyName`.
+  - There's no pagination; the whole filtered array is rendered.
+- **`JobDetailsScreen.js` / `JobCard.js` / `RecommendedScreen.js`:** use `description`, `applyUrl` (optional) and the per-user `fitLabel` / `matchedSkills` / `gapSkills`. The last three only exist on the 5 separate `mockRecommendations` jobs.
+- **Saved and Applied** are placeholders with no job fields.
+
+### Schema (`backend/src/models/Job.js`)
+- **Fields:**
+  - `jobId` (unique): the stable frontend ID
+  - `title`, `companyName`, `area`, `city`, `state`, `country`
+  - `latitude`, `longitude` (range-checked), plus `geo` (GeoJSON point) for the distance sort
+  - `experience` (enum of the 5 values), `jobType` (enum of the 3 values)
+  - `postedAt` (Date), `salary` (display string), `verified`, `requiredSkills`, `description`
+  - optional `applyUrl`; `isDemo` (seeded demo data); timestamps
+- **Not stored:**
+  - `company` and `location` (derivable; rebuilt by `toFrontendJob`)
+  - per-user match fields (`fitLabel`, `matchedSkills`, `gapSkills`)
+  - a text index (search is substring matching today; decide when building the API)
+- **Indexes:** `jobId` (unique), `postedAt` (descending), `city`, `companyName`, `geo` (2dsphere). Each one serves an existing sort or filter.
+
+### Files
+- **New:** `backend/src/config/env.js` (validates variables, URL-encodes credentials, password-free log text), `backend/src/config/db.js`, `backend/src/models/Job.js`, `backend/src/seed/jobTransform.js`, `backend/src/scripts/seedJobs.js`, `backend/tests/jobs.test.js`.
+- **Modified:**
+  - `backend/package.json`: mongoose ^9.11.4, dotenv ^18.0.9, and the `seed:jobs` and `test` scripts.
+  - `backend/.env.example`: placeholders only.
+  - `README.md`, `PROGRESS.md`, `AI_NOTES.md`.
+- **Frontend:** no changes.
+
+### Seed design
+- Reads `ALL_JOBS` straight from the frontend file, so there's no second copy of the data.
+- Aborts without writing if the count isn't 120 or any record is invalid (field checks plus Mongoose `validate()`).
+- Uses `bulkWrite` upserts keyed on `jobId`. `postedAt`, `createdAt` and `updatedAt` are set only on insert, so a re-run doesn't refresh dates and reports honest counts.
+- Never deletes anything. `createIndexes()` only adds missing indexes. It always disconnects, including after errors.
+
+### Commands and results
+- `npm test` (backend, Node's built-in test runner): **11/11 passed**. Covers the 120-record source, schema validation, an exact round trip for every job, coordinates, filter fields, invalid and duplicate records being reported, upsert shape, URI encoding and password-free logs.
+- `npm run seed:jobs` run 1: source 120, invalid 0, **inserted 120**, updated 0, database 120 (demo 120).
+- `npm run seed:jobs` run 2: inserted 0, updated 0, **unchanged 120**, database 120. Re-running is safe.
+- Read-back from Atlas: 120 documents, **0 field mismatches** against the frontend data (excluding `postedAt`, which is frozen at insert), 0 coordinate mismatches. Indexes present as listed above.
+
+### Security
+- **`.env.example` was committed** (`d9eddd1`, pushed to `origin`) containing the real username and password-like and cluster values. Those values **differ** from the real `.env`, but the file now holds placeholders only.
+- `.env` is git-ignored. No credentials appear in the source code. Logs show only `user@cluster/db`.
+
+### Mistakes and fixes
+- The first seed run logged a Mongoose 9 deprecation warning for `validateSync()` (once per document). Switched to the async `validate()` (tests updated), and turned off the Node module-type notice in the npm script.
+
+### Remaining risks
+- `postedAt` is frozen at the first seed (2026-09-29 to 2026-10-24), so "Last 24 hours" and the aging filters will return fewer jobs as days pass. A date-refresh option would need approval.
+- The seed depends on the `frontend/` folder being next to `backend/`, which is fine in this repo.
+- The 5 `mockRecommendations` jobs aren't part of this collection.
+
+## Prompt #24: Atlas connection fix, Job model refactor, 500-job seed
+
+- **Date/time:** 2026-10-24, about 16:40–17:10 IST
+- **AI tool:** Claude
+- **Exact prompt:** the "# Task: Fix MongoDB Atlas Connection, Refactor Job Model, and Seed 500 Realistic Jobs" message:
+  - diagnose and fix the connection;
+  - rename the model to `job.model.js` with a multi-line, fully described schema;
+  - 500 realistic jobs across 7 stacks and Indian cities, with tests;
+  - a safe idempotent seed that reports the reconciliation first;
+  - frontend compatibility through a transform;
+  - read-back verification.
+  - Security constraints: credentials only in `.env`, never logged, no Atlas network changes, no deletes or drops. Out of scope: Jobs APIs, auth, Gemini, Redis/BullMQ, FCM.
+
+### 1. Connection diagnosis
+- **Root cause:** `src/server.js` never loaded `dotenv` and never called `connectDB()`. The connection code from Prompt #23 was only used by the seed script, so the running server was never connected.
+- **Fix:**
+  - `server.js` imports `dotenv/config` and awaits `connectDB()` (which pings) before `listen`.
+  - If the connection fails, it logs a redacted error and exits 1.
+  - `/health` now returns `database: connected|connecting|disconnecting|disconnected`, with 503 when the database isn't connected.
+  - `db.js` logs disconnected/reconnected/error events and shows only `user@cluster/db`.
+- **Verified:** server start, then `curl /health` → `{"status":"ok","database":"connected"}`.
+
+### 2. Model (`backend/src/models/job.model.js`; old `models/Job.js` deleted)
+- Every field is a multi-line object.
+- **Fields:**
+  - `jobId` (unique, `job-<city>-<n>` pattern), `title`, `category` (7-value enum)
+  - `companyName` / `companyIndustry` / `companyAbout`
+  - `area` / `city` / `state` / `country`; `latitude` / `longitude` (range-checked); GeoJSON `geo`
+  - `experience` (6-value enum), `jobType` (Full-time / Contract / Internship)
+  - `salary` sub-schema: `{ min, max ≥ min, currency INR, period year|month }`
+  - `postedAt`, `verified`, `requiredSkills`
+  - description sections: `summary`, `responsibilities` (≥3), `requirements` (≥3), `qualifications` (≥1), `niceToHave`
+  - `applyUrl` (http(s)), `isDemo`, timestamps
+- **Indexes:** `jobId` unique, `postedAt` −1 (newest/aging), `city` and `companyName` (filters), `geo` 2dsphere (distance sort).
+
+### 3. Dataset (`backend/src/data/`)
+- **Source files:**
+  - `cities.js`: 17 cities with real business-district coordinates.
+  - `companies.js`: 30 fictional companies.
+  - `roles.js`: 30 role templates with their own skills, responsibilities and requirements.
+  - `jobs.dataset.js`: a deterministic generator.
+- **Result:** 500 jobs.
+  - Categories: Frontend 68, Backend 100, Full Stack 65, Mobile 67, Data 68, Cloud & DevOps 66, QA & Testing 66.
+  - Job types: Full-time 435, Internship 51, Contract 14.
+  - 117 distinct titles; 500 distinct descriptions; 350 verified.
+  - Salaries rise with seniority; internships pay a monthly stipend.
+  - jobIds `job-blr-1…12` etc. are reused from the 120-job seed.
+
+### 4. Seed (`backend/src/scripts/seedJobs.js`)
+- Validates all 500 records (field checks + Mongoose `validate()`) and aborts without writing on any invalid record or a count other than 500.
+- Before writing, it prints the reconciliation: existing / will update / will insert / not in dataset (left untouched). `--dry-run` stops there.
+- `bulkWrite` upserts by `jobId`. `postedAt` and timestamps go in `$setOnInsert`; `$unset` removes the old `description` field from previous-format documents. It never deletes or drops, and always disconnects.
+
+### 5. Frontend compatibility (`backend/src/seed/jobTransform.js`)
+- `toFrontendJob()` returns `id`, `company`, `companyName`, `location` ("City, State"), `latitude`, `longitude`, `requiredSkills`, `salary` (display text such as "₹8–14 LPA" or "₹15k–25k / month") and `description` (markdown sections: About, The Role, What You'll Do, Requirements, Qualifications, Nice to Have, Required Skills).
+- No frontend files were changed; the app keeps its local mock jobs until a Jobs API exists.
+
+### Commands and results
+- `npm test` (backend): **20/20 passed**. Covers:
+  - size, ids, distinct listings and descriptions, determinism, legacy ids kept;
+  - every category/level/type present; skills consistent with role; salary ordering;
+  - schema validation of all 500; each job within 35 km of its city; district → city check;
+  - invalid and duplicate records reported; schema rejecting bad lat/enum/salary;
+  - transform fields; the frontend's own `validateJobs` and `parseDescription` on converted jobs;
+  - upsert shape; `reconcile()`; URI encoding.
+- `npm run seed:jobs -- --dry-run`: existing **0**, update 0, insert 500, untouched 0.
+- `npm run seed:jobs` run 1: source 500, invalid 0, **inserted 500**, updated 0, unchanged 0, database 500 (demo 500).
+- Run 2: inserted 0, updated 0, **unchanged 500**, database 500, so a re-run is safe.
+- **Atlas read-back:**
+  - 500 docs, 500 unique jobIds, all dataset ids present;
+  - 0 schema errors, 0 geo/lat-lng mismatches, 0 jobs more than 35 km from their city;
+  - 0 leftover `description` fields, 0 content differences;
+  - frontend `validateJobs` true on all 500 converted docs;
+  - indexes `_id_, jobId_1, postedAt_-1, city_1, companyName_1, geo_2dsphere`; a `$near` query around Bengaluru returns Bengaluru jobs.
+- **Secrets check:** `.env` is ignored and not tracked; the real password appears in no changed file.
+
+### Reconciliation
+- Earlier in this prompt, Atlas held 120 jobs. When the seed ran, `spire_db.jobs` held **0 documents**, because the user had deleted the 120 jobs on purpose (confirmed in Prompt #25). I reported it as an unexpected deletion, which was wrong.
+- Nothing was lost by seeding: all 120 old jobIds are part of the new dataset. They are new documents, though, so their old `postedAt` values weren't kept.
+- The other databases on the shared cluster were only listed (read-only) and not touched.
+
+### Mistakes and fixes
+- My summary of an earlier step treated a `count 120` from the frontend's `mockJobs.js` as the Atlas count. Checking the transcript found the real Atlas count (also 120) in a separate inspection, so the reconciliation plan was right at that time. The data then changed outside the session.
+- The Prompt #23 notes list a `geo` 2dsphere index as present, but before this seed the collection had no `geo_2dsphere` index. It exists now.
+- A temp log path (`../../spire_srv_tmp.log`) pointed at `D:\`. The safety check blocked an `rm` there and nothing was deleted; logs moved to the scratchpad.
+- To free port 5000 for the health check I stopped the process listening there. That may have been the user's own `npm run dev`, which will need restarting.
+- The first README edit script failed (CRLF line endings) before writing anything. It was re-run with line endings kept.
+
+### Remaining risks
+- `postedAt` is set once at insert (spread over the last 30 days), so "Last 24 hours" and aging counts will shrink (14 jobs were within 24 h at seed time).
+- The 500 jobs aren't visible in the app until the Jobs API is built.
+- The credential-like values in the already-pushed commit `d9eddd1` (reported in Prompt #23) are still in Git history.
+
+## Prompt #25: Verify the current state (no changes)
+
+- **Date/time:** 2026-10-24, about 17:15 IST
+- **AI tool:** Claude
+- **Exact prompt:** "The previous 120 jobs were intentionally deleted by me. The empty collection before seeding was expected. … Now verify the current state:"
+  1. 500 jobs in Atlas;
+  2. unique jobIds and required fields;
+  3. backend tests;
+  4. `/health` connected;
+  5. Git changes and a credential scan without printing secrets;
+  6. no deletes, no reseed, no frontend changes, no Jobs APIs.
+
+### Results
+- **Atlas (read-only):** `countDocuments` 500; 500 unique jobIds; duplicate-jobId aggregate 0. All 19 required schema paths are present on every document, 0 documents fail schema validation, and all 500 are `isDemo`.
+- **`npm test` (backend):** 20/20 passed.
+- **`/health`:** server started on port 5077 so the process already on 5000 wasn't touched → `{"status":"ok","database":"connected"}` (HTTP 200), then stopped. The existing server on 5000 also returns connected.
+- **Git:**
+  - 7 modified files; `backend/tests/jobs.test.js` staged (by the user); new backend folders untracked; nothing committed.
+  - `backend/.env` is ignored, and no `.env` file is tracked.
+- **Credential scan** (values compared, never printed):
+  - The real `DB_PASSWORD` and `DB_CLUSTER_URL` appear in no file and no commit.
+  - The real `DB_USERNAME` appears in history only, in commit `d9eddd1`.
+  - No `mongodb://user:pass@` URIs in the working tree.
+
+### Mistakes and fixes
+- In Prompt #24 I treated the deliberately emptied collection as an unexpected deletion and investigated it. Corrected in PROGRESS and the Prompt #24 notes.

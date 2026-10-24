@@ -14,7 +14,7 @@ Practical assessment project: a job-matching mobile app. Users can upload a resu
 | File picking | `expo-document-picker` (PDF / Word resumes) | Done |
 | Icons | `@expo/vector-icons` (Ionicons) + `expo-font` | Done |
 | Backend API | Node.js + Express 5, JavaScript ES modules | Initialized |
-| Database | MongoDB | Not started |
+| Database | MongoDB Atlas + Mongoose 9 | `Job` model (`src/models/job.model.js`); 500 demo jobs seeded |
 | AI | Gemini API | Not started |
 | Background jobs | BullMQ + Redis | Not started |
 | Push notifications | Firebase Cloud Messaging (FCM) | Not started |
@@ -43,7 +43,14 @@ spire_ai/
 │       ├── utils/             # pickResume, format helpers
 │       └── data/              # mockMap.js (All Jobs map), mockRecommendations.js (sample recommended jobs)
 ├── backend/           # Express API
-│   ├── src/server.js
+│   ├── src/
+│   │   ├── server.js          # loads .env, connects to MongoDB, then listens
+│   │   ├── config/            # env.js (reads DB_* vars), db.js (connect / disconnect / state)
+│   │   ├── models/            # job.model.js (Job schema, enums, indexes)
+│   │   ├── data/              # 500-job demo dataset: cities.js, companies.js, roles.js, jobs.dataset.js
+│   │   ├── seed/              # jobTransform.js (validation, DB document ↔ frontend job shape)
+│   │   └── scripts/           # seedJobs.js
+│   ├── tests/                 # node --test
 │   ├── .env.example
 │   └── package.json
 ├── AI_NOTES.md        # Log of AI-assisted prompts
@@ -65,7 +72,7 @@ The frontend and backend are installed and run separately.
 ```bash
 cd backend
 npm install
-cp .env.example .env   # optional for now; PORT defaults to 5000
+cp .env.example .env   # then fill in the DB_* values (required: the server won't start without a database)
 npm run dev            # start with nodemon (auto-reload)
 # or
 npm start              # start with node
@@ -89,8 +96,29 @@ Backend variables live in `backend/.env`. Copy them from [backend/.env.example](
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PORT` | `5000` | Port the Express server listens on |
+| `DB_USERNAME` | — | MongoDB Atlas database user |
+| `DB_PASSWORD` | — | Its password (URL-encoded automatically; never logged) |
+| `DB_CLUSTER_URL` | — | Atlas cluster host, e.g. `cluster0.xxxxx.mongodb.net` |
+| `DB_NAME` | — | Database name (`spire_db`) |
 
-More variables (MongoDB URI, Gemini key, Redis URL, Firebase credentials) will be added as those features are built.
+More variables (Gemini key, Redis URL, Firebase credentials) will be added as those features are built.
+
+### Seeding the jobs
+
+`src/data/jobs.dataset.js` builds 500 demonstration jobs, all fictional companies and marked `isDemo: true`. They cover 7 categories (Frontend, Backend, Full Stack, Mobile, Data, Cloud & DevOps, QA & Testing) across 17 Indian cities, with coordinates in real business districts. The dataset is deterministic, so every run produces the same jobIds and content. Load it into `spire_db.jobs` with:
+
+```bash
+cd backend
+npm run seed:jobs -- --dry-run   # show how existing documents map onto the dataset; writes nothing
+npm run seed:jobs                # upsert by jobId
+npm test                         # dataset, schema, transform and seed tests
+```
+
+The seed runs only when you run `npm run seed:jobs` yourself. It doesn't run on server start (`npm start` / `npm run dev`), `npm install` or `npm test`. Run it again only after changing `src/data/` or when the database is empty.
+
+The seed is safe to re-run. It validates every record first and writes nothing if any record is invalid or the count isn't 500. It upserts by `jobId` and never deletes or drops anything; documents that aren't in the dataset are left alone and listed. `postedAt` is set only on first insert, and a second run reports `unchanged: 500`.
+
+The frontend still reads its local mock jobs. When the Jobs API is built, it should convert documents with `toFrontendJob()` in `src/seed/jobTransform.js`, which produces the fields the app already uses (`id`, `company`, `location`, `salary` text, `description` with sections).
 
 Frontend variables live in `frontend/.env`. Copy them from [frontend/.env.example](frontend/.env.example), then restart Expo. They're bundled into the app, so only public identifiers go here.
 
@@ -107,15 +135,15 @@ Google sign-in doesn't work in Expo Go. It needs a development build or APK (`np
 
 | Method | Path | Response |
 | --- | --- | --- |
-| GET | `/health` | `{ "status": "ok" }` |
+| GET | `/health` | `200 { "status": "ok", "database": "connected" }`, or `503 { "status": "degraded", "database": "disconnected" }` |
 
 ## Testing
 
-Unit tests (guest storage, start-up restore and profile-merge logic; Node's built-in test runner, no extra packages):
+Unit tests use Node's built-in test runner, with no extra packages:
 
 ```bash
-cd frontend
-npm test
+cd frontend && npm test   # guest storage, start-up restore, profile merge
+cd backend && npm test    # 500-job dataset, Job schema, frontend transform, seed upserts/reconcile
 ```
 
 Guest data (profile, skills, experience, education, resume details) is saved on the device in AsyncStorage under a guest-only namespace (`spire:guest:*`). The resume file is copied into the app's private document folder, so both survive restarts.
@@ -133,7 +161,7 @@ Manual checks:
 ```bash
 # Backend: start the server, then:
 curl http://localhost:5000/health
-# expected: {"status":"ok"}
+# expected: {"status":"ok","database":"connected"}
 
 # Frontend: start Expo, then check the bundle builds:
 cd frontend && npm start
@@ -168,7 +196,7 @@ cd frontend && npm start
 - Production map tile provider
 - Resume upload to the backend, real parsing and profile auto-fill (UI ready and simulated; backend missing)
 - AI-based job recommendations (Gemini) (UI ready, showing mock jobs; backend missing)
-- All Jobs: seeded jobs, search, map and list views
+- Jobs API, and the All Jobs screen using the 500 seeded jobs (they are in MongoDB; the app still shows its local mock jobs)
 - Saved and Applied tabs
 - Opening Job Details from All Jobs (needs an All Jobs job list); saving and emailing jobs
 - Linking guest data to an account
