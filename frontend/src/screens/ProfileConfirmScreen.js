@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +19,7 @@ import { confirmResume } from '../services/resumeService';
 import { discardStagedResumes, removeLegacyLocalResumes } from '../storage/resumeFiles';
 import { mergeExtractedProfile } from '../utils/profileMerge';
 import { confirmedResumeMetadata } from '../utils/resumeProcessing';
+import useKeyboardVisible from '../hooks/useKeyboardVisible';
 import { colors, radius, spacing } from '../theme';
 
 const EMPTY_PROFILE = {
@@ -67,6 +67,7 @@ function validate(values) {
 // already know (an earlier profile or the signed-in user).
 export default function ProfileConfirmScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const keyboardVisible = useKeyboardVisible();
   const dispatch = useDispatch();
   const profile = useSelector(selectProfile);
   const user = useSelector(selectUser);
@@ -173,12 +174,13 @@ export default function ProfileConfirmScreen({ navigation, route }) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    // The footer sits below the ScrollView (not over it), so a focused field
+    // is scrolled into view above the footer; 'padding' lifts both above the
+    // keyboard where the window isn't resized for it (it adds nothing when it is).
+    <KeyboardAvoidingView style={[styles.container, { paddingTop: insets.top }]} behavior="padding">
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 96 }]}
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
@@ -388,7 +390,7 @@ export default function ProfileConfirmScreen({ navigation, route }) {
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+      <View style={[styles.footer, { paddingBottom: (keyboardVisible ? 0 : insets.bottom) + spacing.md }]}>
         {Object.values(errors).some(Boolean) && (
           <Text style={styles.footerError}>Please fix the highlighted fields.</Text>
         )}
@@ -442,6 +444,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface,
+  },
+  scroll: {
+    flex: 1,
   },
   content: {
     padding: spacing.lg,
@@ -587,10 +592,6 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
     alignItems: 'flex-end',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,

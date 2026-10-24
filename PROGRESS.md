@@ -209,3 +209,8 @@ The core assessment requirements come first. Other features must not break them.
 - [ ] Working demo on a device or emulator (the UI runs on an Android emulator; core features still missing)
 - [ ] Ability to explain the code
 - [ ] Ability to make a small live change during the demo
+- [x] **Email/password accounts + guest linking** (Prompt #45):
+  - User / Session / Profile / GuestLink models; register, login, logout, me, link-guest; profile API with revisions.
+  - Login / Register screens, secure session storage, logout, account-scoped data, profile server sync.
+  - Tests: backend 149, frontend 43. Emulator E2E: Scenarios A, B (both cases), C and D passed. Signed-in resume upload in the UI not verified (emulator out of memory).
+- [x] **Keyboard fix for Login, Register and Profile Confirm** + signed-in resume / recommendation E2E (Prompt #46): verified on the Android emulator. Tests: backend 149, frontend 43.

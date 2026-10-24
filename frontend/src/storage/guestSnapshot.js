@@ -80,18 +80,28 @@ export function sanitizeResume(resume) {
   return clean;
 }
 
-export function serializeGuestData({ profile, resume }, now = Date.now()) {
+// Server sync state of the profile: the server revision it is based on and
+// whether it has changes the server hasn't confirmed yet.
+export function sanitizeSync(sync) {
+  const revision = Number.isInteger(sync?.revision) && sync.revision > 0 ? sync.revision : null;
+  return { revision, dirty: sync?.dirty === true };
+}
+
+// Used for the guest's and for each account's data (separate keys, see keys.js).
+export function serializeGuestData({ profile, resume, sync }, now = Date.now()) {
   return JSON.stringify({
     version: SNAPSHOT_VERSION,
     savedAt: now,
     profile: sanitizeProfile(profile),
     resume: sanitizeResume(resume),
+    sync: sanitizeSync(sync),
   });
 }
 
-// → { ok: true, data: { profile, resume } } or { ok: false, reason }
+// → { ok: true, data: { profile, resume, sync } } or { ok: false, reason }
+// (Snapshots saved before sync existed read as revision null / not dirty.)
 export function parseGuestData(raw) {
-  if (raw == null) return { ok: true, data: { profile: null, resume: null } };
+  if (raw == null) return { ok: true, data: { profile: null, resume: null, sync: sanitizeSync(null) } };
   let parsed;
   try {
     parsed = JSON.parse(raw);
@@ -102,6 +112,10 @@ export function parseGuestData(raw) {
   if (parsed.version !== SNAPSHOT_VERSION) return { ok: false, reason: 'unknown-version' };
   return {
     ok: true,
-    data: { profile: sanitizeProfile(parsed.profile), resume: sanitizeResume(parsed.resume) },
+    data: {
+      profile: sanitizeProfile(parsed.profile),
+      resume: sanitizeResume(parsed.resume),
+      sync: sanitizeSync(parsed.sync),
+    },
   };
 }

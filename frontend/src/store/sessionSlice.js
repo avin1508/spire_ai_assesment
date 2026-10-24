@@ -1,16 +1,18 @@
 import { createSlice } from '@reduxjs/toolkit';
 
 // The signed-in user plus the shared guest login sheet. Every session starts
-// as a guest; `signedIn` is dispatched only after the backend has verified
-// the user's Google sign-in (see services/authService.js).
+// as a guest; `signedIn` is dispatched only after the backend has accepted
+// the email/password and issued a session (see store/auth.js).
 //
 // authSheet.intent: optional screen to open after a successful sign-in,
 // e.g. { name: 'Main', params: { screen: 'Profile' } }.
+// notice: a one-off message for the user (e.g. guest data couldn't be moved yet).
 const sessionSlice = createSlice({
   name: 'session',
   initialState: {
     user: null,
     authSheet: { visible: false, intent: null },
+    notice: null,
   },
   reducers: {
     signedIn(state, action) {
@@ -19,6 +21,7 @@ const sessionSlice = createSlice({
     },
     signedOut(state) {
       state.user = null;
+      state.notice = null;
     },
     authSheetOpened(state, action) {
       // Only one sheet at a time: a second request while open is ignored.
@@ -28,13 +31,21 @@ const sessionSlice = createSlice({
     authSheetClosed(state) {
       state.authSheet = { visible: false, intent: null };
     },
+    noticeShown(state, action) {
+      state.notice = action.payload;
+    },
+    noticeDismissed(state) {
+      state.notice = null;
+    },
   },
 });
 
-export const { signedIn, signedOut, authSheetOpened, authSheetClosed } = sessionSlice.actions;
+export const { signedIn, signedOut, authSheetOpened, authSheetClosed, noticeShown, noticeDismissed } =
+  sessionSlice.actions;
 
 export const selectUser = (state) => state.session.user;
 export const selectIsGuest = (state) => !state.session.user;
 export const selectAuthSheet = (state) => state.session.authSheet;
+export const selectNotice = (state) => state.session.notice;
 
 export default sessionSlice.reducer;

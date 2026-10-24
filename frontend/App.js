@@ -1,13 +1,14 @@
 import { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { store } from './src/store';
-import { restoreGuestData } from './src/store/guestPersistence';
+import { restoreSession } from './src/store/auth';
 import { selectStorageStatus } from './src/store/profileSlice';
+import { noticeDismissed, selectNotice } from './src/store/sessionSlice';
 import GuestLoginSheet from './src/components/GuestLoginSheet';
 import { navigationRef } from './src/navigation/navigationRef';
 import { colors } from './src/theme';
@@ -24,15 +25,24 @@ const navigationTheme = {
   },
 };
 
-// Restores saved guest data before showing the app, so screens never show
-// (or save) an empty profile in place of the stored one.
+// Restores the saved session (signed-in account or guest) before showing
+// the app, so screens never show (or save) an empty profile in place of the
+// stored one.
 function AppContent() {
   const dispatch = useDispatch();
   const storageStatus = useSelector(selectStorageStatus);
+  const notice = useSelector(selectNotice);
 
   useEffect(() => {
-    dispatch(restoreGuestData());
+    dispatch(restoreSession());
   }, [dispatch]);
+
+  // One-off messages about the session (e.g. it ended, or guest data couldn't be moved yet).
+  useEffect(() => {
+    if (!notice) return;
+    Alert.alert('Account', notice);
+    dispatch(noticeDismissed());
+  }, [notice, dispatch]);
 
   if (storageStatus === 'loading') {
     return (

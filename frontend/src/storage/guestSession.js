@@ -31,3 +31,16 @@ export function getGuestSessionId() {
   pending ??= loadOrCreate();
   return pending;
 }
+
+// Starts a new guest (after logout, or once this guest's data is linked to
+// an account): later guest requests can't reach the previous guest's data.
+export async function resetGuestSession() {
+  const id = Crypto.randomUUID();
+  pending = Promise.resolve(id);
+  try {
+    await AsyncStorage.setItem(GUEST_SESSION_KEY, id);
+  } catch (error) {
+    console.warn('[guestSession] could not save the guest session id:', error?.message ?? error);
+  }
+  return id;
+}

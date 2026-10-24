@@ -2530,3 +2530,82 @@ one correction need to if the user will not login na so he can not apply ok add 
 ### Notes
 - Recommendations are not cached on the device. With the backend down, the tab shows the error state instead of the earlier results.
 - The emulator's guest profile now holds the user's MERN resume data.
+
+## Prompt #44: Social login inspection (read-only)
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Prompt:** inspect auth, User model, guest storage and Firebase for social login and guest linking; report only.
+- **Result:** report only, no files changed. Found:
+  - no User model or auth API;
+  - the app had only a Google sign-in button stub;
+  - the guest profile lived on the device only.
+
+## Prompt #45: Email/password authentication + guest data linking
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Exact prompt:** "# Implement Email/Password Authentication + Guest Data Linking …" (Register / Login UI; User + Profile models; bcrypt; revocable sessions; complete profile persistence; Scenarios A–D exactly; ownership, idempotency, partial failure; 31 required tests; emulator E2E; no commit).
+
+### Built
+- **Backend:**
+  - Models: User (bcrypt hash, not selected by default), Session (SHA-256 of a random 256-bit token, expiry + revocation, TTL index), Profile (complete profile, one per owner, `revision`), GuestLink (one per guest session).
+  - `/api/auth` register / login / logout / me / link-guest, with in-memory rate limits; `/api/profile` GET / PUT with revision check (409 on conflict).
+  - The owner middleware now verifies `Authorization: Bearer` (an invalid token is 401, never a guest fallback).
+  - Resume `archivedAt` (additive) so a guest resume can be kept without replacing the account's resume.
+- **Linking:** an idempotent workflow (each decision is saved before its step; re-keying guest documents means data is moved, never copied). No transactions, because the dev/test MongoDB are standalone servers.
+- **Frontend:**
+  - Login / Register screens; the login sheet opens them instead of Google; `expo-secure-store` for the session; `expo-auth-session` and `expo-web-browser` removed.
+  - Owner-aware API client and local storage (guest key vs `spire:account:<id>:data`); profile server sync with revision, dirty flag and conflict handling.
+  - Account-aware recommendation sync; logout in Profile → Settings; restore at start-up.
+
+### Verified
+- **Tests:** backend 149/149 (+28 in `tests/auth.test.js`), frontend 43/43 (+13 in `tests/auth.test.mjs`), Android bundle OK.
+- **Emulator, real backend** (made-up test accounts and resumes only):
+  - guest register → A (link completed: profile, resume, 2 recommendations);
+  - restart keeps A;
+  - logout → empty guest, session revoked, A's server data untouched; restart after logout stays guest;
+  - direct register B → no profile;
+  - guest (Asha) → login A: A's profile document SHA-256 identical before and after, guest resume archived;
+  - guest (Asha) → login B (no profile) → linked;
+  - A ↔ B switching shows only each account's profile and recommendations;
+  - restart as B keeps B;
+  - form errors (required fields, password mismatch, wrong password).
+- **Not verified in the UI:** a resume upload while signed in. The emulator ran out of memory (low-memory killer) and could no longer start Expo Go. It is covered by backend test 29.
+
+### Mistakes and fixes
+- A Node edit script turned `\n` into a real line break inside a string (syntax error); fixed by hand.
+- I staged a file rename with `git mv`; unstaged it again (nothing committed).
+- First link rule archived a new account's guest resume when no profile was linked; changed so a new account (no profile, no resume) gets the guest resume as its current one.
+- The Settings alert couldn't be closed with Back; made it dismissible.
+
+## Prompt #46: Keyboard overlap fix + signed-in resume E2E
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Exact prompt:** "Fix the keyboard overlapping/hiding form content and verify the fix on the Android emulator. Also complete the pending signed-in resume upload and recommendation E2E verification. …"
+
+### Root cause
+- **Profile Confirm:** the "Done!" footer was `position: absolute` over the ScrollView. Android scrolls a focused input only above the ScrollView's bottom edge (the keyboard top), so the input ended up behind the footer. The footer also kept the navigation-bar padding while the keyboard was open, and its error message made it taller still. Reproduced on the emulator: a typed skill was hidden behind the footer.
+- **Both forms:** `KeyboardAvoidingView` was off on Android (`behavior={undefined}`). That relies on the window resizing, which Expo Go on API 34 does, but Android 15+ edge-to-edge builds don't.
+
+### Fix
+- New `hooks/useKeyboardVisible.js`.
+- **ProfileConfirmScreen:** the footer sits in the layout below a `flex: 1` ScrollView; `behavior="padding"` on all platforms; no bottom inset while the keyboard is open; the 96 px content padding is removed.
+- **AuthScreen:** `behavior="padding"`, `flex: 1` ScrollView, no bottom inset while the keyboard is open.
+
+### Verified (emulator, API 34, rebooted first because of the earlier low memory)
+- **Profile Confirm:**
+  - a field at y=1717 (under the keyboard) scrolled to y=521 when focused;
+  - top, middle and bottom fields typed into;
+  - the footer error stays above the keyboard;
+  - "Done!" pressed with the keyboard open saved the profile;
+  - no double gap from `padding`.
+- **Register:** all 4 fields; the "Passwords don't match" error and the button above the keyboard; registering with the keyboard open created account C.
+- **Login:** email and password visible; the "Incorrect email or password." error and the button above the keyboard; logging in with the keyboard open worked.
+- **Signed-in E2E (synthetic account C, made-up resumes):**
+  - upload + confirm → C's profile = Ravi (rev 2), resume owned by C and current, new recommendation (15, 8 matching fields only);
+  - restart restores profile, resume and 15 recommendations;
+  - logout shows a guest with none of C's data;
+  - login restores everything.
+- **Tests:** backend 149/149, frontend 43/43; Android bundle OK.
