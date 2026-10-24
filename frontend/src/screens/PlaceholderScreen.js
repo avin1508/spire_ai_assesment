@@ -1,10 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Button from '../components/Button';
+import useRequireAuth from '../hooks/useRequireAuth';
 import { colors, spacing, typography } from '../theme';
 
 // Generic "coming soon" screen. Title/icon/message come from route params.
+// With `requiresAuth`, guests see a sign-in button that opens the login sheet.
 export default function PlaceholderScreen({ route }) {
-  const { title = route.name, icon = 'construct-outline', message } = route.params ?? {};
+  const { title = route.name, icon = 'construct-outline', message, requiresAuth } =
+    route.params ?? {};
+  const { isGuest, openLogin } = useRequireAuth();
 
   return (
     <View style={styles.container}>
@@ -13,11 +18,17 @@ export default function PlaceholderScreen({ route }) {
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message ?? 'This section is coming soon.'}</Text>
+      {requiresAuth && isGuest && (
+        <Button label="Sign in to continue" variant="outline" onPress={() => openLogin()} style={styles.signIn} />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  signIn: {
+    marginTop: spacing.lg,
+  },
   container: {
     flex: 1,
     alignItems: 'center',

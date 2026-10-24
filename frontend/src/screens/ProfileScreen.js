@@ -5,6 +5,7 @@ import ScreenHeader from '../components/ScreenHeader';
 import RoundIconButton from '../components/RoundIconButton';
 import Button from '../components/Button';
 import useResumeUpload from '../hooks/useResumeUpload';
+import useRequireAuth from '../hooks/useRequireAuth';
 import { selectProfile, selectResume } from '../store/profileSlice';
 import { formatDateRange, getInitials } from '../utils/format';
 import { colors, radius, spacing } from '../theme';
@@ -17,10 +18,18 @@ export default function ProfileScreen({ navigation }) {
   const profile = useSelector(selectProfile);
   const resume = useSelector(selectResume);
   const uploadResume = useResumeUpload({ returnTo: 'Profile' });
+  // Settings and resume download need an account; guests get the login sheet.
+  const { requireAuth } = useRequireAuth();
+  const backToProfile = { name: 'Main', params: { screen: 'Profile' } };
 
   const settingsButton = (
     <Pressable
-      onPress={() => Alert.alert('Coming soon', 'Settings are not available yet.')}
+      onPress={() =>
+        requireAuth(
+          () => Alert.alert('Coming soon', 'Settings are not available yet.'),
+          backToProfile
+        )
+      }
       accessibilityRole="button"
       style={styles.settings}
     >
@@ -104,9 +113,13 @@ export default function ProfileScreen({ navigation }) {
                 label="Download resume"
                 variant="solid"
                 onPress={() =>
-                  Alert.alert(
-                    'Not available yet',
-                    'Downloading will work once resumes are stored on the server.'
+                  requireAuth(
+                    () =>
+                      Alert.alert(
+                        'Not available yet',
+                        'Downloading will work once resumes are stored on the server.'
+                      ),
+                    backToProfile
                   )
                 }
               />

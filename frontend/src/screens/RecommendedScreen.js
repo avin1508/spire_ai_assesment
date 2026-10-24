@@ -17,7 +17,7 @@ import {
   selectRecommendations,
 } from '../store/profileSlice';
 import useResumeUpload from '../hooks/useResumeUpload';
-import useSignUpPrompt from '../hooks/useSignUpPrompt';
+import useRequireAuth from '../hooks/useRequireAuth';
 import {
   EMPTY_FILTERS,
   countActiveFilters,
@@ -44,7 +44,9 @@ export default function RecommendedScreen() {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [openSheet, setOpenSheet] = useState(null); // 'sort' | 'filters' | null
 
-  const { goToSignUp, promptSignUp } = useSignUpPrompt();
+  const { openLogin } = useRequireAuth();
+  const goToSignUp = () => openLogin();
+  const promptSignUp = () => openLogin();
 
   const allJobs = recommendations.items;
   const jobs = useMemo(

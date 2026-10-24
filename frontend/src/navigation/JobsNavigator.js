@@ -1,5 +1,4 @@
 import { StyleSheet, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import AppHeader from '../components/AppHeader';
 import JobsTabBar from '../components/JobsTabBar';
@@ -10,6 +9,7 @@ import { useSelector } from 'react-redux';
 import { selectIsGuest } from '../store/sessionSlice';
 import { selectProfile, selectRecommendations } from '../store/profileSlice';
 import useResumeUpload from '../hooks/useResumeUpload';
+import useRequireAuth from '../hooks/useRequireAuth';
 import { jobTabCounts, unreadNotifications } from '../data/mockMap';
 import { colors } from '../theme';
 
@@ -19,7 +19,7 @@ import { colors } from '../theme';
 const JobsTab = createMaterialTopTabNavigator();
 
 export default function JobsNavigator() {
-  const navigation = useNavigation();
+  const { openLogin } = useRequireAuth();
   const isGuest = useSelector(selectIsGuest);
   const profile = useSelector(selectProfile);
   const recommendations = useSelector(selectRecommendations);
@@ -30,7 +30,7 @@ export default function JobsNavigator() {
   let headerAction = null;
   if (isGuest) {
     headerAction = profile
-      ? { label: 'Sign up', onPress: () => navigation.navigate('Profile') }
+      ? { label: 'Sign up', onPress: () => openLogin() }
       : { label: 'Upload Resume', onPress: startResumeUpload };
   }
   const recommendedCount =
@@ -69,6 +69,7 @@ export default function JobsNavigator() {
             title: 'Saved',
             icon: 'bookmark-outline',
             message: 'Jobs you save will appear here.',
+            requiresAuth: true,
           }}
         />
         <JobsTab.Screen
@@ -79,6 +80,7 @@ export default function JobsNavigator() {
             title: 'Applied',
             icon: 'checkmark-done-outline',
             message: 'Jobs you apply to will appear here.',
+            requiresAuth: true,
           }}
         />
       </JobsTab.Navigator>

@@ -1,7 +1,7 @@
 # Progress
 
 **Current phase:** Phase 2: UI development — Recommended jobs UI and resume-to-recommendations flow (waiting for review)
-**Current prompt:** #13
+**Current prompt:** #15
 **Last updated:** 2026-10-24
 
 ## Locked feature scope
@@ -57,12 +57,18 @@ The core assessment requirements come first. Other features must not break them.
 - [x] Profile tab (profile card, resume card, Experience and Education), Experience and Education lists with add, edit and delete, simulated resume parsing with sample data, and the resume flow reusable from Profile (Prompt #12)
 
 - [x] Profile screen add / edit icons made display-only, not clickable (Prompt #13)
+- [x] Real interactive map (Leaflet + OpenStreetMap tiles in a WebView), 120 mock jobs in 10 cities, clustering, map/list (Prompt #14; committed by the user; pin preview and list/filters not fully verified)
+- [x] Shared Google-only guest login sheet, opened from all protected entry points through Redux + `useRequireAuth` (Prompt #15)
 
 ### In progress
-- [ ] Review of Prompts #7–#13
+- [ ] Review of Prompts #14–#15
+- [ ] Finish verifying Prompt #14: pin preview, list view, search and filters on the map, current location
 
 ### Pending
-- [ ] Commit of the Prompt #7–#12 changes (waiting for approval)
+- [ ] Commit of the Prompt #15 changes (waiting for approval)
+- [ ] Google OAuth client IDs in `frontend/.env`, plus a development build or APK (Google sign-in can't run in Expo Go)
+- [ ] Backend `POST /api/auth/google` that verifies the Google ID token and returns a session (`authService.signInWithGoogleToken` rejects until then)
+- [ ] Production map tile provider (`EXPO_PUBLIC_MAP_TILE_URL`); the public OSM server is for development only
 - [ ] Replace simulated resume parsing (`parseResume` MOCK) with the backend parser
 - [ ] All Jobs job list (needed to open Job Details from All Jobs)
 - [ ] Save job and email job for signed-in users (currently "Coming soon")
@@ -72,11 +78,9 @@ The core assessment requirements come first. Other features must not break them.
 - [ ] Backend: recommendations API to back `fetchRecommendations`
 - [ ] Persisting the confirmed profile (currently in-memory only)
 - [ ] MongoDB connection and data models
-- [ ] Auth (Login/Signup) — the session slice's `signedIn` / `signedOut` actions are ready to be wired
 - [ ] Save job (signed-in) and Saved/Applied persistence
 - [ ] Seeded jobs, jobs list API with search
 - [ ] Jobs list view content, Job detail screen
-- [ ] Real map integration
 - [ ] All other target features listed above
 
 ## Test results

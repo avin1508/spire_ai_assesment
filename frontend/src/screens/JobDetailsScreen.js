@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { FIT_STYLES, LockableIcon } from '../components/JobCard';
 import { selectIsGuest } from '../store/sessionSlice';
-import useSignUpPrompt from '../hooks/useSignUpPrompt';
+import useRequireAuth from '../hooks/useRequireAuth';
 import { formatPostedAge } from '../utils/format';
 import { parseDescription } from '../utils/parseDescription';
 import { colors, radius, spacing } from '../theme';
@@ -15,7 +15,9 @@ export default function JobDetailsScreen({ navigation, route }) {
   const { job } = route.params;
   const insets = useSafeAreaInsets();
   const isGuest = useSelector(selectIsGuest);
-  const { promptSignUp } = useSignUpPrompt();
+  const { openLogin } = useRequireAuth();
+  // After sign-in, come back to this job.
+  const promptSignUp = () => openLogin({ name: 'JobDetails', params: { job } });
 
   const matched = job.matchedSkills ?? [];
   const gaps = job.gapSkills ?? [];

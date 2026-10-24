@@ -1422,3 +1422,412 @@ one thing need to the correction here that is jo edit wale buttons hai ne profil
 
 ### AI mistakes and fixes
 - One edit targeted a comment that didn't exist in the file, so it failed and nothing changed. It was redone against the actual `SectionCard` code.
+
+---
+
+## Prompt #14: Real interactive map with 100+ mock jobs (All Jobs)
+
+- **Date/time:** 2026-10-24, about 05:10–05:30 IST (work committed by the user as `9b475a2 completed the map`)
+- **AI tool:** Claude
+- **Objective:** Replace the hand-drawn map with a real interactive map, and put 100+ mock jobs on it at real coordinates, with clustering, a job preview, a map/list switch and working filters.
+
+### Exact prompt
+
+````
+# Task: Replace the Hardcoded Map with a Real Interactive Map and 100+ Mock Jobs
+
+We are developing the frontend UI of an existing React Native Expo application using JavaScript.
+
+The current Opportunities map screen uses a hardcoded or static map representation. Replace it with a real, interactive geographical map and populate it with at least 100 realistic frontend mock jobs positioned using actual geographic coordinates.
+
+**Important:** Implement this directly in the existing project. Inspect the current code before making changes. Do not create a separate demo app or redesign unrelated screens.
+
+## 1. Inspect the Existing Project
+
+Before implementation:
+
+- Inspect the existing Expo SDK version and React Native version.
+- Review `package.json`, installed dependencies, navigation structure, and the current map screen.
+- Understand the existing UI components, styling, filters, sorting, and Map/List switching.
+- Select a compatible mapping library based on the existing project setup.
+
+Do not upgrade Expo or React Native unnecessarily. Avoid breaking existing functionality.
+
+## 2. Use a Real Interactive Map
+
+- Replace the static map image, fake map background, or hardcoded geographical representation with a real interactive map.
+- Do not use Google Maps or require a Google Maps API key.
+- Evaluate an Expo-compatible solution using OpenStreetMap-compatible map tiles, such as React Native Maps with an appropriate tile provider, or MapLibre if compatible with the project.
+- Choose a tile provider whose terms permit the application's intended production use.
+- Do not assume that public OpenStreetMap tile servers provide unlimited or guaranteed production access.
+- Display real geographical features, roads, boundaries, and city locations.
+- Support map panning, pinch-to-zoom, and appropriate map attribution.
+- Ensure the implementation targets an actual Android production build, not just a screenshot or web preview.
+- Document any required development build, native configuration, permissions, or provider credentials.
+
+## 3. Create at Least 100 Dummy Jobs
+
+Create a centralized frontend mock-data file containing **at least 100 distinct job records**.
+
+Distribute the jobs across multiple real Indian cities, including:
+
+- Bengaluru
+- Pune
+- Chennai
+- Hyderabad
+- Mumbai
+- Delhi NCR
+- Noida
+- Gurugram
+- Kolkata
+- Ahmedabad
+
+Use realistic, geographically valid coordinates for individual job locations, such as plausible office districts or business areas within each city.
+
+Do not place every job at the city center. Jobs within the same city should have distinct, geographically plausible coordinates. Avoid generating random screen positions or arbitrary latitude/longitude values.
+
+Each job record should contain fields such as:
+
+- `id`
+- `title`
+- `companyName`
+- `location`
+- `latitude`
+- `longitude`
+- `experience`
+- `jobType`
+- `postedAt`
+- `salary`
+- `description`
+- `requiredSkills`
+
+Use realistic sample job titles and companies relevant to a job-search application, including React Native Developer, React Developer, Node.js Developer, MERN Stack Developer, Backend Developer, Software Engineer, and other relevant roles.
+
+Use consistent data types and unique IDs. Validate that all coordinates are numeric and within valid latitude/longitude ranges.
+
+**Data integrity requirements:**
+
+- All 100+ jobs must come from the same centralized mock dataset.
+- City-level job counts must be calculated from the dataset wherever practical.
+- Company markers and individual job markers must be consistent with the dataset.
+- Do not maintain unrelated hardcoded counts that contradict the actual mock records.
+- Keep mock jobs clearly identified in the code as demonstration data, not verified real vacancies.
+- Do not call backend APIs or claim that these jobs are real openings.
+
+## 4. Render Jobs on the Map
+
+- Render job markers using each job's actual `latitude` and `longitude`.
+- Position markers geographically through the selected map library.
+- Display appropriate job markers, city-level markers, or job-count clusters depending on the current zoom level.
+- When several jobs are close together, prevent excessive overlap using clustering or another appropriate approach supported by the selected library.
+- When the user zooms in, allow individual job locations to become visible.
+- When the user taps an individual marker, display a job preview containing the job title, company, location, and relevant details.
+- When the user taps a cluster, show the relevant job count and allow the user to explore the clustered jobs.
+- Ensure that markers remain attached to their geographical coordinates while the map is panned and zoomed.
+- Add functional zoom-in and zoom-out controls.
+- Implement current-location interaction when location permissions are available.
+- Handle denied or unavailable location permissions gracefully without crashing.
+
+## 5. Preserve the Existing UI
+
+Keep the current screen's visual design and layout as close as possible to the supplied reference screenshot.
+
+Preserve the existing:
+
+- Opportunities header
+- Recommended, All Jobs, Saved, and Applied tabs
+- Search field
+- Filter chips
+- Sort controls and sort sheet
+- All Filters sheet
+- Floating map controls
+- View Companies action
+- View Jobs action
+- Agent Sigma floating button, if already present
+- Bottom navigation
+
+Do not remove or unnecessarily redesign existing components to accommodate the map.
+
+## 6. Map/List Synchronization
+
+- Implement functional Map/List switching using the same centralized mock-jobs dataset.
+- The List view must display the same jobs represented on the map.
+- Search must filter jobs by relevant fields, such as title, company, and location.
+- Existing filter and sorting interactions must work with the mock dataset.
+- Keep the existing Recommended, Verified, and Last 24 Hours controls functional where they already exist.
+- Ensure that changing filters updates the visible job markers, clusters, and list results consistently.
+- Ensure that displayed counts reflect the relevant filtered dataset wherever practical.
+- Avoid duplicating mock-job arrays separately inside the Map and List screens.
+
+## 7. Keep the Scope Frontend-Only
+
+This task is limited to the existing frontend UI and its local mock data.
+
+Do not implement:
+
+- Backend APIs
+- Database integration
+- Authentication changes
+- Live job fetching
+- AI recommendations
+- AI-powered search
+- Real company or vacancy verification
+
+Keep the implementation structured so that the mock-data source can later be replaced by backend API responses without rewriting the entire map UI.
+
+## 8. Verification Requirements
+
+After implementing the changes:
+
+1. Run the app using the project's supported Expo workflow.
+2. Verify that real map tiles load.
+3. Verify that the map can be panned and zoomed.
+4. Verify that at least 100 mock jobs are present in the centralized dataset.
+5. Verify that markers use the correct coordinates from their corresponding job records.
+6. Verify that clusters and city-level job counts are consistent with the dataset.
+7. Verify that marker selection displays the correct job preview.
+8. Verify that Map/List switching, search, filters, and sorting work together.
+9. Check Android compatibility and document any required native setup.
+10. Verify that the chosen tile provider's usage terms are suitable for the intended deployment.
+
+If you cannot run the Android build or verify a feature in the current environment, clearly state what could not be tested. Do not claim that unverified functionality works.
+
+## 9. Final Implementation Report
+
+After completing the implementation, report:
+
+- The selected map library and tile provider, including the reason for the choice.
+- Any production usage limitations or configuration requirements.
+- The total number of mock jobs created and the cities covered.
+- The files created or modified.
+- The commands required to run the application.
+- Any remaining limitations or verification steps that require a physical device or Android build.
+
+**Final instruction:** Implement the changes directly in the existing codebase. Do not stop at a plan, sample snippet, static image, or implementation instructions. Preserve the existing app architecture and unrelated screens, and avoid unnecessary dependencies or unrelated changes.
+````
+
+### Choices
+- **Map:** Leaflet 1.9.4 with leaflet.markercluster 1.5.3, running inside `react-native-webview`. `react-native-maps` on Android is built on the Google Maps SDK and needs a Google API key, which the prompt ruled out. MapLibre needs a custom native build. The WebView approach works in Expo Go and in a normal production APK with no native map setup.
+- **Tiles:** public OpenStreetMap server by default, with attribution shown. That server's policy only allows light use, so production must set `EXPO_PUBLIC_MAP_TILE_URL` / `EXPO_PUBLIC_MAP_ATTRIBUTION` to a provider and plan that permits the traffic (see `src/config/map.js`).
+- **Location:** `expo-location`, with its config plugin and a when-in-use permission text in `app.json`.
+
+### Changes
+- **New:**
+  - `src/data/mockJobs.js`: **120 MOCK jobs**, 12 in each of Bengaluru, Pune, Chennai, Hyderabad, Mumbai, New Delhi, Noida, Gurugram, Kolkata and Ahmedabad, placed in real business districts with small offsets. Includes `validateJobs`.
+  - `src/config/map.js`, `src/components/JobsMap.js`, `JobListItem.js`, `CompanySheet.js`, `src/utils/geo.js`.
+- **Rewritten:** `src/screens/OpportunitiesScreen.js` (map and list over one filtered dataset).
+- **Changed:** `JobsNavigator.js` (swipe turned off on All Jobs so map drags don't switch tabs), `jobFilters.js` (search includes area and required skills), `mockMap.js` (cut down to UI constants), `app.json`, `package.json`.
+- **Removed:** `MapPlaceholder.js`.
+- `npx expo install --fix` updated expo 58.0.17 → 58.0.19 (patch release, flagged by expo-doctor).
+
+### Verification
+- Dataset checked in Node: 120 jobs, 120 unique IDs, 120 distinct coordinates, 12 per city, all within valid ranges.
+- `expo-doctor` passed 20/20 and the Android export built.
+- **Emulator:**
+  - Real OpenStreetMap tiles loaded with attribution. Clusters showed 36 (NCR = Delhi + Noida + Gurugram), 24, 24, 12, 12 and 12, which add up to 120. "View jobs (120)" was shown.
+  - Tapping a cluster showed "36 jobs in this area · 16 companies". Zoom in split NCR into area clusters, and further zoom split Gurugram into Sector 44, Sohna Road and Golf Course Road.
+- **Not verified** (testing was interrupted by the user):
+  - tapping a single job pin and its preview
+  - the list view, search, filters and sort on this screen
+  - the "Last 24 hours" chip
+  - current location (emulator GPS was set to Bengaluru but never tested)
+  - pinch-zoom by hand
+
+---
+
+## Prompt #15: Shared Google-only guest login sheet
+
+- **Date/time:** 2026-10-24, about 13:35–13:50 IST
+- **AI tool:** Claude
+- **Objective:** One reusable "Guest Mode" login bottom sheet with the user's male illustration and a single "Continue with Google" button, opened from every protected entry point, with honest handling of sign-in that can't complete yet.
+
+### Exact prompt
+
+The user's message was "problem" followed by this pasted task (the earlier "start the aap" / server questions were handled separately):
+
+````
+# Task: Implement a Reusable Google-Only Guest Login Bottom Sheet
+
+Implement a single, reusable Google-only authentication bottom sheet in the existing React Native Expo application using JavaScript.
+
+Use the supplied Guest Mode screenshot as the exact UI reference. The user has already generated the male character illustration and placed it in the project's assets folder.
+
+**Important:** Inspect the existing project before changing anything. Implement directly in the existing codebase. Do not create a separate app or redesign unrelated screens.
+
+## 1. Inspect the Existing Project
+
+Before implementation:
+
+- Inspect the Expo SDK version, React Native version, `package.json`, navigation structure, and current authentication state management.
+- Identify existing login dialogs, guest-mode logic, protected actions, and screen-level authentication checks.
+- Locate the existing male illustration asset in the project's assets folder.
+- Reuse the existing architecture and JavaScript. Do not introduce TypeScript.
+- Avoid unnecessary dependency upgrades or unrelated changes.
+
+## 2. Reproduce the Guest Login Bottom Sheet
+
+Recreate the supplied screenshot as closely as possible.
+
+Preserve:
+
+- White bottom sheet with rounded top corners and a small drag indicator.
+- Lock icon and blue `GUEST MODE` badge.
+- Close button in the top-right corner.
+- Heading: `Get personalized job recommendations`, with the same black and blue text styling.
+- Supporting text: `Create an account to see roles matched to your skills, experience, and goals — refreshed every day.`
+- Three benefit rows:
+  - **Matches your skills** — Get relevant job recommendations.
+  - **Curated opportunities** — See high-quality roles from top companies.
+  - **Updated daily** — New opportunities are added every day.
+- Original spacing, typography, icon colors, illustration placement, and responsive layout.
+
+### Male Illustration
+
+Use the existing generated male PNG from the project's assets folder.
+
+- Locate the actual file rather than generating another image.
+- Use it as a transparent illustration on the right side of the dialog, similar to the female character's position in the reference screenshot.
+- Keep the text and benefits readable on the left.
+- Size and position the image appropriately for different device heights and widths.
+- Preserve the transparent background; do not place the entire dialog screenshot inside an image.
+- Do not use the female illustration if the male asset is available.
+
+## 3. Google Is the Only Login Option
+
+At the bottom of the dialog, show **one Google Sign-In button only**.
+
+- Retain the reference screenshot's button styling, rounded corners, border, shadow, and Google logo.
+- Use a clear label such as `Continue with Google`.
+- Remove the Apple and Email login buttons completely.
+- Do not implement Apple Sign-In, email/password login, OTP, or any other authentication provider.
+- Do not display three empty button spaces or leave unnecessary gaps where the removed buttons were.
+
+## 4. One Shared Dialog Across the Entire App
+
+Implement one reusable authentication bottom-sheet component and one centralized mechanism to open it.
+
+The same dialog must open whenever a guest user attempts to sign in or accesses a protected feature from any screen, including:
+
+- Opportunities
+- Recommended Jobs
+- All Jobs
+- Job Details
+- Saved Jobs
+- Applied Jobs
+- Profile
+- Any other existing screen or locked feature that requires authentication
+
+Examples:
+
+- Tapping `Sign up` in the header opens the shared dialog.
+- Tapping a locked Recommended Jobs feature opens the same dialog.
+- Tapping a protected action on the Job Details screen opens the same dialog.
+- Tapping a protected feature in Profile opens the same dialog.
+
+Do not create separate copies of the dialog for individual screens.
+
+Preserve the current screen behind the bottom sheet with the same dimmed overlay as the reference. The close button must dismiss the sheet and return the user to the screen they were viewing.
+
+Prevent multiple instances from opening simultaneously.
+
+## 5. Implement Actual Google Sign-In
+
+Before selecting an authentication library, verify its compatibility with the existing Expo SDK and React Native versions.
+
+- Implement real Google Sign-In using an appropriate solution for the existing Expo project.
+- Configure the necessary OAuth client IDs, redirect/deep-link handling, and platform configuration.
+- Do not require a Google Maps API key; this is Google authentication, not Google Maps.
+- Never hardcode OAuth secrets in the source code.
+- Keep required configuration in environment variables or the appropriate native configuration.
+- Handle cancellation, network failures, invalid tokens, missing credentials, and unsuccessful authentication gracefully.
+- Display an appropriate error message when sign-in cannot complete.
+- Do not simulate successful authentication or mark a user as logged in merely because the Google button was tapped.
+
+If the backend authentication service has not yet been implemented, complete the reusable UI and compatible sign-in setup that can be supported by the existing project. Clearly identify what remains necessary for secure backend authentication. Do not pretend that a verified backend session exists.
+
+When backend authentication is implemented, the backend must verify the Google identity token and establish the application's authenticated session. Do not trust a client-supplied name, email, or profile as proof of identity.
+
+## 6. Authentication State and Navigation
+
+- Integrate authentication state with the app's existing state-management architecture.
+- After successful authentication, update the guest/logged-in UI consistently across screens.
+- Close the dialog only after the authentication flow has succeeded according to the implemented authentication architecture.
+- If a guest opens the dialog while attempting a protected action, preserve that intended action or destination and resume it after successful login when appropriate.
+- If the user dismisses the dialog or cancels Google Sign-In, return them to their previous screen without marking them as authenticated.
+- Avoid duplicating authentication state across unrelated components.
+
+## 7. Scope Restrictions
+
+- Work only on the reusable Google login dialog and its necessary integration with existing screens.
+- Preserve unrelated screens and their existing visual design.
+- Do not implement backend APIs or database functionality that is outside the current task.
+- Do not add Apple, Email, OTP, or other authentication options.
+- Do not change the existing job map, mock jobs, filters, or other unrelated features.
+- Do not introduce TypeScript.
+
+## 8. Verification
+
+After implementation:
+
+1. Verify that the male PNG asset is used in the dialog.
+2. Verify that only one Google Sign-In button is visible.
+3. Verify that the dialog opens from multiple screens through the same shared component.
+4. Verify that the close button dismisses the dialog correctly.
+5. Verify that cancellation or failed Google authentication does not log the user in.
+6. Verify the authenticated and guest UI states wherever the available environment permits.
+7. Run the existing Expo workflow and fix regressions introduced by the changes.
+8. If real Google authentication cannot be tested because OAuth credentials or required native configuration are missing, document the exact missing configuration rather than claiming success.
+
+## 9. Final Report
+
+Report:
+
+- The shared dialog component and global opening mechanism.
+- The male PNG asset path used.
+- The files created or modified.
+- The Google Sign-In library and configuration selected.
+- Any OAuth credentials or backend verification still required.
+- The commands to run and test the application.
+- Which behaviors were actually verified and which remain untested.
+
+**Final instruction:** Implement the changes directly in the existing project. Reuse the existing male illustration asset, show Google as the only login option, and make the same bottom sheet accessible from every relevant screen. Do not stop at a plan or code snippets.
+````
+
+(No Guest Mode screenshot was actually attached, so the sheet follows the written description.)
+
+### Approach
+- **One sheet:** `src/components/GuestLoginSheet.js`, mounted once in `App.js` inside the `NavigationContainer`.
+- **One way to open it:** Redux `session.authSheet` (`authSheetOpened(intent)` / `authSheetClosed`). A request while the sheet is already open is ignored, so it can't open twice. `src/hooks/useRequireAuth.js` gives every screen `requireAuth(action, intent)` and `openLogin(intent)`. `intent` is a serializable screen target that's opened after a successful sign-in, via `navigationRef`.
+- **Google:** `expo-auth-session` (`providers/google`, `useIdTokenAuthRequest`) with `expo-web-browser` and `expo-crypto`, installed via `expo install` for SDK 58.
+  - Client IDs come from `EXPO_PUBLIC_GOOGLE_{ANDROID,IOS,WEB}_CLIENT_ID` (`src/config/auth.js`, `.env.example`). No secrets are in the app.
+  - Google's hook throws without a client ID, so the button checks first and otherwise shows a "not configured" error naming the missing variable.
+- **No fake login:**
+  - Google's ID token goes to `signInWithGoogleToken` in `src/services/authService.js`, which documents the backend contract (`POST /api/auth/google`, server-side token check).
+  - Until that backend exists, it always rejects. The user is never marked as signed in, and the sheet shows the reason.
+  - Cancelling or dismissing Google leaves the user as a guest.
+- **app.json:** `scheme: "spireai"` (redirect), `android.package` and `ios.bundleIdentifier` `com.spireai.iexchange` (needed to create OAuth client IDs). `expo-web-browser` plugin added by `expo install`.
+- **Illustration:** `frontend/assets/guest-login-male.png` (1087×1447, RGBA with transparency), on the right. Its width is 42% of the screen, up to 200 dp.
+- **Replaced the old Alert-based `useSignUpPrompt`** (deleted). Entry points now using the shared sheet:
+  - Jobs header "Sign up"
+  - Recommended: "Sign Up to Explore More", locked save and learning on cards
+  - Job Details: email, save, apply, gap skills (intent: return to that job)
+  - Saved and Applied: new "Sign in to continue" button for guests
+  - Profile: Settings and resume download (intent: Profile)
+
+### Verification and results
+- `expo-doctor` passed 20/20, and the Android export built.
+- **Emulator:**
+  - The sheet shows the badge, the heading (black plus blue), the subtext, the 3 benefit rows, the male PNG on the right and one "Continue with Google" button, with no Apple or Email.
+  - Tapping Google, with no client ID set, showed "Google Sign-In isn't configured for this build. Add EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID…" and the app stayed in guest mode.
+  - The ✕ and a backdrop tap both close the sheet and return to the same screen.
+  - The sheet opened from: Recommended landing, the Saved tab, the Jobs header "Sign up", Job Details Apply (✕ returned to the same job) and Profile Settings.
+- **Not verified:**
+  - A real Google account sign-in. It needs OAuth client IDs, plus a development build or APK with the registered package and SHA-1. Google no longer supports this flow inside Expo Go.
+  - The signed-in state after a real login, which needs the backend `/api/auth/google`.
+  - The "continue where you left off" navigation after sign-in, for the same reason.
+  - The Applied tab button (same component as Saved).
+
+### AI mistakes and fixes
+- The first test tapped the backdrop's "Close" label, whose centre sits under the sheet, so nothing closed. Fixed in the test by tapping the ✕ button.
+- The Profile "Settings" test first hit Expo Go's floating dev-tools button, which covers the same corner. Fixed by relaunching with `__expo_disable_fab=1`. It's Expo Go's own button, not app UI.
+- The benefit text ran slightly under the illustration. Widened the text column's right margin.

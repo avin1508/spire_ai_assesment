@@ -92,6 +92,17 @@ Backend variables live in `backend/.env`. Copy them from [backend/.env.example](
 
 More variables (MongoDB URI, Gemini key, Redis URL, Firebase credentials) will be added as those features are built.
 
+Frontend variables live in `frontend/.env`. Copy them from [frontend/.env.example](frontend/.env.example), then restart Expo. They're bundled into the app, so only public identifiers go here.
+
+| Variable | Description |
+| --- | --- |
+| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | Google OAuth client ID for Android (package `com.spireai.iexchange` + your signing SHA-1) |
+| `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | Google OAuth client ID for iOS (bundle id `com.spireai.iexchange`) |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | Web client ID (also the audience the backend checks) |
+| `EXPO_PUBLIC_MAP_TILE_URL` / `EXPO_PUBLIC_MAP_ATTRIBUTION` | Optional map tile provider. The public OpenStreetMap default is for development only. |
+
+Google sign-in doesn't work in Expo Go. It needs a development build or APK (`npx expo run:android`, or an EAS build) with the client IDs set. Even then, sign-in only finishes once the backend `POST /api/auth/google` exists to verify the token.
+
 ## API
 
 | Method | Path | Response |
@@ -144,8 +155,8 @@ cd frontend && npm start
   - These are **UI only**: the buttons do nothing yet, the search doesn't filter, and the map is a locally drawn illustration, not a real map.
 
 ### Missing (planned)
-- Real map integration and list view content
-- Login / Signup and Profile (the session context is ready to be wired to auth)
+- Completing Google sign-in: the login sheet and Google flow are built, but the backend token check and session are still needed
+- Production map tile provider
 - Resume upload to the backend, real parsing and profile auto-fill (UI ready and simulated; backend missing)
 - AI-based job recommendations (Gemini) (UI ready, showing mock jobs; backend missing)
 - All Jobs: seeded jobs, search, map and list views
