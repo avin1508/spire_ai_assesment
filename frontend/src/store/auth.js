@@ -1,6 +1,7 @@
 import { ownerDataLoaded, sessionCleared } from './profileSlice';
 import { noticeShown, signedIn, signedOut } from './sessionSlice';
 import { flushProfileSync } from './profileServerSync';
+import { unregisterFromAccount } from './pushRegistration';
 import { fetchMe, linkGuest, loginAccount, logoutSession, registerAccount } from '../services/authService';
 import { fetchProfile } from '../services/profileService';
 import { clearAuthSession, getAuthSession, loadAuthSession, saveAuthSession } from '../storage/authSession';
@@ -175,6 +176,7 @@ export const logout = () => async (dispatch, getState) => {
   try {
     if (session) {
       await linkPendingGuest(session);
+      await unregisterFromAccount(session.token); // no more account notifications on this phone
       try {
         await logoutSession(session.token);
       } catch (error) {

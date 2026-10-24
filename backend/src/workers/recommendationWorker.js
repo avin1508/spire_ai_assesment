@@ -7,6 +7,7 @@ import { selectCandidates } from '../services/jobMatching.js';
 import { buildRankingPrompt } from '../services/gemini.js';
 import { estimateTokens } from '../services/geminiQuota.js';
 import { ResumeProcessingError, resumeError } from '../services/resumeErrors.js';
+import { notifyRecommendationReady } from '../services/push.service.js';
 
 // Generates one recommendation run:
 //   select candidate jobs (selecting_jobs) → shared quota check → Gemini
@@ -58,7 +59,10 @@ const QUOTA_MESSAGES = {
   quota_rate: "High demand right now. We'll finish your recommendations shortly.",
 };
 
-export function createRecommendationProcessor({ rankJobs, quota, now = () => Date.now() }) {
+// `notify(recommendationId)` runs after a run with results was saved as
+// completed (the push notification, services/push.service.js). Its failures
+// are logged and never affect the saved recommendation.
+export function createRecommendationProcessor({ rankJobs, quota, now = () => Date.now(), notify = notifyRecommendationReady }) {
   return async function processRecommendation(job) {
     const { recommendationId, run } = job.data;
     const doc = await Recommendation.findById(recommendationId);
@@ -164,7 +168,13 @@ export function createRecommendationProcessor({ rankJobs, quota, now = () => Dat
         deferredSince: null,
       },
     });
-    return saved.modifiedCount ? { completed: true } : { skipped: true };
+    if (!saved.modifiedCount) return { skipped: true };
+    try {
+      await notify(recommendationId);
+    } catch (error) {
+      console.warn(`[recommendation-worker] ${recommendationId} notification failed: ${error?.message ?? error}`);
+    }
+    return { completed: true };
 
     // Temporary errors are retried by BullMQ (bounded, jittered); the last
     // attempt or a permanent error ends in "failed" with a retry flag.

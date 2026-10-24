@@ -6,6 +6,9 @@
 const PREFIX = 'spire';
 
 export const GUEST_DATA_KEY = `${PREFIX}:guest:data:v1`;
+// When the notification prompt was last dismissed ("Not now"). A device
+// preference, not profile data: kept across login / logout.
+export const PUSH_PROMPT_KEY = `${PREFIX}:device:pushPromptDismissedAt:v1`;
 // Random id identifying this guest's uploads to the backend (storage/guestSession.js).
 export const GUEST_SESSION_KEY = `${PREFIX}:guest:session:v1`;
 

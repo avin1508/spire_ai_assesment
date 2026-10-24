@@ -2609,3 +2609,86 @@ one correction need to if the user will not login na so he can not apply ok add 
   - logout shows a guest with none of C's data;
   - login restores everything.
 - **Tests:** backend 149/149, frontend 43/43; Android bundle OK.
+
+## Prompt #47: Push notifications for completed recommendations
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Exact prompt:** "Implement Firebase Push Notifications for completed job recommendations. … Inspect first, implement only what is needed, verify, and stop."
+
+### Found
+- **Trigger:** the worker's conditional save to `completed` (`recommendationWorker.js`, `updateOne(active, …)` with `modifiedCount === 1`). Queued, deferred, failed, superseded and stale runs never reach it; a reused fresh result never re-runs the worker.
+- **Firebase:**
+  - client side only: `google-services.json` (project `mypushapp-9ea07`), `expo-notifications` + `expo-dev-client` installed;
+  - no EAS `projectId`, so Expo push tokens are not possible;
+  - no server credential.
+
+### Built
+- **Approach:** the native FCM registration token (`getDevicePushTokenAsync`) plus FCM HTTP v1 from the worker (`google-auth-library`, already in the image, now pinned). The service-account file comes from `FIREBASE_SERVICE_ACCOUNT_FILE`, kept outside the repo; key-file patterns are gitignored.
+- **Backend:**
+  - `PushDevice` model (unique token, one owner); `PUT` / `DELETE /api/devices` (owner from the verified session or the guest header);
+  - `push.service.js`: atomic `notification` claim on the recommendation (at most once), message with the real count, removal of unregistered tokens, failures logged without tokens;
+  - the worker calls the notifier after the save inside try/catch, so the run stays completed;
+  - empty results are not notified.
+- **Frontend:**
+  - `notifications/push.js` loads `expo-notifications` only outside Expo Go;
+  - `store/pushRegistration.js`: register on owner load / sign-in / logout→guest / token rotation; permission asked after a profile is confirmed;
+  - on logout the device is removed from the account before the session is revoked;
+  - tap → Jobs › Recommended + refresh for the current owner.
+
+### Verified
+- **Tests:** backend 160/160 (+11, `tests/push.test.js`), frontend 48/48 (+5, `tests/push.test.mjs`); Android bundle OK.
+- **Mutation check:** without the claim condition, the duplicate and failed/superseded tests fail.
+- **Emulator (Expo Go):** the app runs; push is skipped there.
+- **Worker log:** "Push notifications: disabled (FIREBASE_SERVICE_ACCOUNT_FILE is not set)".
+
+### Not verified: real delivery
+Real delivery and tapping a real notification were not verified. Blockers:
+1. no Firebase service-account key on the server;
+2. no development build (Expo Go can't receive this app's FCM messages).
+
+### Mistakes and fixes
+- The first version imported `expo-notifications` at start-up, which crashed Expo Go ("Cannot find native module 'ExpoTopicSubscriptionModule'"). The Expo Go check via `Constants.executionEnvironment` was also wrong: SDK 58 Expo Go reports "bare". Fixed with a lazy `require` and `isRunningInExpoGo()`; verified on the emulator.
+
+## Prompt #48: Firebase key file, development build and real push verification
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Exact prompt:** "Continue the existing Firebase Push Notifications implementation … I have placed the Firebase service-account JSON file in the project root … Use that existing file directly. … Continue with the Android development build and real end-to-end push notification verification for both guest and logged-in users, including tapping the notification."
+
+### Key file
+- **Location:** found in `backend/`, not in the project root as described: `mypushapp-9ea07-firebase-adminsdk-fbsvc-75e07c0ba2.json`. Used where it is; not moved or renamed.
+- **Git and Docker:** ignored (`**/*firebase-adminsdk*.json`), not tracked, and added to `.dockerignore`. The Dockerfiles copy only `src` and `package*.json`.
+- **Resolver:** `findServiceAccountFile()` looks for exactly one `*-firebase-adminsdk-*.json` in the backend directory, then the project root (paths from `import.meta.url`, not the working directory). The project id comes from the key's `project_id`; no env vars.
+- **Docker:** both compose files bind-mount that one file read-only into `/app` for the worker, with `create_host_path: false`.
+- **Checked:** the worker logs "Push notifications: enabled (Firebase project mypushapp-9ea07)"; the mount is read-only; Google issued an OAuth access token (not printed); the logs contain no credential text.
+
+### Development build
+- **First build:** failed on the Windows 260-character path limit (CMake/ninja, safe-area-context codegen).
+- **Workaround:** a temporary `subst S:` drive, plus `buildStagingDirectory = C:/cx` in the generated `android/app/build.gradle`.
+- **Second issue:** incremental Kotlin broke across `D:`/`S:` roots and fell back to a very slow mode; fixed with `kotlin.incremental=false` in the generated `android/gradle.properties`. `android/` is gitignored.
+- **Result:** `BUILD SUCCESSFUL`, installed as `com.spireai.iexchange`. `subst` removed afterwards. Prebuild's `package.json` script change was reverted.
+
+### Fixed during verification
+- On Android, `getPermissionsAsync` reports "never asked" as `denied` + `canAskAgain: true`, so the prompt never appeared. Now mapped to undetermined (`permissionState`, unit-tested).
+- **Race:** a run could finish before the user allowed notifications (`no_devices`). A device that registers within 15 minutes now gets that run's notification; the `no_devices`→`sending` claim is atomic, so it is never sent twice (backend test added).
+
+### Real push verified (emulator, Android 14, Google Play, dev build)
+- **Guest:**
+  - permission prompt after Done → Allow → the FCM token registered to the guest;
+  - a new profile, app in the background → "Your job recommendations are ready!" / "We've found 15 jobs matching your profile. Tap to explore them." arrived;
+  - tapping it opened Jobs › Recommended (15) with the guest's matches; the server shows `sent(1)`.
+- **Logged in (synthetic account C):**
+  - login moved the device to `user:…`; C's profile was not overwritten by the guest;
+  - a signed-in upload in the background → the push arrived; tapping it opened Recommended (15) as the account (no Sign up); `sent(1)`.
+- **Logout:** guest view empty (Build your profile, Recommended 0); the device moved to a new guest.
+- **Tests:** backend 162/162, frontend 49/49; Android bundle OK.
+
+## Prompt #49: "Uncaught (in promise) TypeError: undefined is not a function" red box
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Prompt:** screenshot of the red "Console Error" box + "what is this".
+- **Cause:** `store/pushRegistration.js` chained registration steps on a promise without a `catch`. A step that threw rejected the chain unhandled; the Metro log showed "Uncaught (id: 0)" then "Promise rejection handled (id: 0)" when the next step was chained. The throwing call was most likely an old function reference after Fast Refresh, while I moved `permissionState` between files during verification.
+- **Fix:** the chain now ends in `.catch()`, which logs `[push] sync failed` (message + short stack) and keeps the next step working.
+- **Verified:** dev build restarted, login + logout as the test account; the device moved to the new guest, no error and no red box. Frontend tests 49/49.

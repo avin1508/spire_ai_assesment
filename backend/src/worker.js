@@ -8,6 +8,7 @@ import { maintainRecommendations } from './services/recommendations.service.js';
 import { createRedisClient } from './queue/resumeQueue.js';
 import { startResumeWorker } from './workers/resumeWorker.js';
 import { startRecommendationWorker } from './workers/recommendationWorker.js';
+import { pushSenderFromKeyFile, setPushSender } from './services/push.service.js';
 
 // Background worker: resume parsing and recommendation generation (BullMQ),
 // both sharing one Gemini quota guard in Redis, plus periodic maintenance.
@@ -64,6 +65,15 @@ async function start() {
   console.log(
     `Gemini quota guard: RPM ${rpm ?? 'not set'}, TPM ${tpm ?? 'not set'}, daily budget ${dailyBudget ?? 'not set'} ` +
       '(unset limits are not enforced locally; 429 responses still pause all workers)'
+  );
+
+  // Push notifications for finished recommendations (optional).
+  const push = pushSenderFromKeyFile();
+  setPushSender(push.sender);
+  console.log(
+    push.sender
+      ? `Push notifications: enabled (Firebase project ${push.projectId})`
+      : `Push notifications: disabled (${push.reason})`
   );
 
   const resumeWorker = startResumeWorker({ extractProfile, quota });

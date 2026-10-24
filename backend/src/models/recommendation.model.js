@@ -142,6 +142,20 @@ const recommendationSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // "Recommendations ready" push notification for this completed run
+    // (services/push.service.js). Set once, atomically, before sending, so a
+    // retried or repeated completion never notifies twice.
+    notification: {
+      type: new mongoose.Schema(
+        {
+          status: { type: String, enum: ['sending', 'sent', 'no_devices', 'failed'], required: true },
+          at: { type: Date, required: true },
+          sent: { type: Number, default: 0 },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
   },
   {
     timestamps: true,

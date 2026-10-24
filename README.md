@@ -213,6 +213,7 @@ Google sign-in doesn't work in Expo Go. It needs a development build or APK (`np
 | POST | `/api/auth/logout` | Bearer → `204`, the session is revoked |
 | GET | `/api/auth/me` | Bearer → `{ user }` |
 | POST | `/api/auth/link-guest` | Bearer + `X-Guest-Session` → links that guest's profile / resume / recommendations to the account (idempotent; one account per guest session) |
+| PUT / DELETE | `/api/devices` | `{ token, platform: "android" }`: register this device's FCM token for the owner (moves it from any previous owner) / remove it (owner only). The worker sends "Your job recommendations are ready!" once per completed run with results, when `FIREBASE_SERVICE_ACCOUNT_FILE` is configured |
 | GET / PUT | `/api/profile` | The owner's complete profile; PUT `{ profile, baseRevision }`, 409 `profile_conflict` if the server copy is newer |
 
 Resume and recommendation endpoints accept either `Authorization: Bearer <token>` (signed-in user) or `X-Guest-Session` (guest). An invalid token is rejected with 401, never treated as a guest.

@@ -6,6 +6,7 @@ import resumesRouter from './routes/resumes.routes.js';
 import recommendationsRouter from './routes/recommendations.routes.js';
 import authRouter from './routes/auth.routes.js';
 import profileRouter from './routes/profile.routes.js';
+import devicesRouter from './routes/devices.routes.js';
 
 // MongoDB driver errors that mean "database unavailable or too slow".
 const UNAVAILABLE_ERRORS = new Set([
@@ -54,6 +55,7 @@ export function createApp() {
   app.use('/api/recommendations', recommendationsRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/profile', profileRouter);
+  app.use('/api/devices', devicesRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'not_found', message: `No route for ${req.method} ${req.path}` });
@@ -93,7 +95,7 @@ export function createApp() {
           ? 'Resume processing is temporarily unavailable. Please try again.'
           : req.path.startsWith('/api/recommendations')
             ? 'Recommendations are temporarily unavailable. Please try again.'
-            : req.path.startsWith('/api/auth') || req.path.startsWith('/api/profile')
+            : req.path.startsWith('/api/auth') || req.path.startsWith('/api/profile') || req.path.startsWith('/api/devices')
               ? 'Your account is temporarily unavailable. Please try again.'
               : 'Jobs are temporarily unavailable. Please try again.',
       });

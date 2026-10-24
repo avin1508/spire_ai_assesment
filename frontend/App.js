@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
@@ -9,6 +9,9 @@ import { store } from './src/store';
 import { restoreSession } from './src/store/auth';
 import { selectStorageStatus } from './src/store/profileSlice';
 import { noticeDismissed, selectNotice } from './src/store/sessionSlice';
+import { refreshRecommendations } from './src/store/profileSlice';
+import { subscribeToNotificationTaps } from './src/notifications/push';
+import { notificationTarget } from './src/utils/pushNotifications';
 import GuestLoginSheet from './src/components/GuestLoginSheet';
 import { navigationRef } from './src/navigation/navigationRef';
 import { colors } from './src/theme';
@@ -32,6 +35,7 @@ function AppContent() {
   const dispatch = useDispatch();
   const storageStatus = useSelector(selectStorageStatus);
   const notice = useSelector(selectNotice);
+  const [navigationReady, setNavigationReady] = useState(false);
 
   useEffect(() => {
     dispatch(restoreSession());
@@ -44,6 +48,20 @@ function AppContent() {
     dispatch(noticeDismissed());
   }, [notice, dispatch]);
 
+  // "Recommendations ready" → Jobs › Recommended, refreshed for whoever is
+  // signed in now (once the saved session has been restored).
+  // (Taps include the notification that launched the app.)
+  const ready = navigationReady && storageStatus !== 'loading';
+  useEffect(() => {
+    if (!ready) return undefined;
+    return subscribeToNotificationTaps((data) => {
+      const target = notificationTarget(data);
+      if (!target) return;
+      navigationRef.navigate(target.name, target.params);
+      dispatch(refreshRecommendations());
+    });
+  }, [ready, dispatch]);
+
   if (storageStatus === 'loading') {
     return (
       <View style={styles.loading}>
@@ -53,7 +71,7 @@ function AppContent() {
   }
 
   return (
-    <NavigationContainer ref={navigationRef} theme={navigationTheme}>
+    <NavigationContainer ref={navigationRef} theme={navigationTheme} onReady={() => setNavigationReady(true)}>
       <AppNavigator />
       {/* The one shared login sheet, opened from any screen via useRequireAuth. */}
       <GuestLoginSheet />
