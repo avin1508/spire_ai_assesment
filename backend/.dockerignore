@@ -1,0 +1,11 @@
+# Keep secrets, local installs and dev-only files out of the image.
+.env
+.env.*
+node_modules
+npm-debug.log*
+tests
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+.git
+.gitignore

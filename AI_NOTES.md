@@ -1961,3 +1961,572 @@ one correction need to if the user will not login na so he can not apply ok add 
 - Manual education can't be added in the UI (Education icons are display-only since #13; there's no "Show all").
 - Recommendations aren't saved; they're reloaded from the mock after restore.
 - After corruption recovery, the next save overwrites the broken record; the backup copy stays.
+
+---
+
+## Prompt #23: MongoDB Job schema and seed of the 120 frontend jobs
+
+- **Date/time:** 2026-10-24, about 16:15–16:40 IST
+- **AI tool:** Claude
+- **Exact prompt:** the "# Task: Build MongoDB Job Schema and Seed Existing Frontend Jobs" message (Step 1 inspect the frontend; Step 2 schema; Step 3 idempotent seed; Step 4 Atlas configuration with credentials from `.env`; Step 5 compatibility; scope: model, connection, conversion, seed, tests, docs only).
+
+### What was inspected in the frontend (and what it showed)
+- **`src/data/mockJobs.js` (`ALL_JOBS`):**
+  - 120 records with 18 fields, none optional. IDs are unique, `job-<city>-<n>`.
+  - `experience` has 5 values, `jobType` 3, `salary` 5 display strings; `country` is always India; 9 states, 10 cities, 14 titles, 16 companies, 60 areas, 34 skills.
+  - `company` always equals `companyName`, and `location` always equals `city + ", " + state`.
+  - `postedAt` is generated relative to load time.
+- **`utils/jobFilters.js`:**
+  - Search covers title, company, area, location and the skill lists.
+  - Filters: country, location (the city part of `location`), company, experience, title, aging (24h/7d/30d from `postedAt`), state (the state part of `location`), plus the Verified and Last 24 hours chips.
+  - Sorts: recommended (no change), newest (`postedAt`), fitment (`fitLabel`), distance (`distanceKm` from the user's location).
+- **`OpportunitiesScreen.js`, `JobsMap.js`, `JobListItem.js`, `CompanySheet.js`:**
+  - Map markers use `id`, `latitude` and `longitude`.
+  - List cards show `area`, `city`, `experience`, `jobType`, `salary`, `requiredSkills` and `postedAt`.
+  - Company counts use `companyName`.
+  - There's no pagination; the whole filtered array is rendered.
+- **`JobDetailsScreen.js` / `JobCard.js` / `RecommendedScreen.js`:** use `description`, `applyUrl` (optional) and the per-user `fitLabel` / `matchedSkills` / `gapSkills`. The last three only exist on the 5 separate `mockRecommendations` jobs.
+- **Saved and Applied** are placeholders with no job fields.
+
+### Schema (`backend/src/models/Job.js`)
+- **Fields:**
+  - `jobId` (unique): the stable frontend ID
+  - `title`, `companyName`, `area`, `city`, `state`, `country`
+  - `latitude`, `longitude` (range-checked), plus `geo` (GeoJSON point) for the distance sort
+  - `experience` (enum of the 5 values), `jobType` (enum of the 3 values)
+  - `postedAt` (Date), `salary` (display string), `verified`, `requiredSkills`, `description`
+  - optional `applyUrl`; `isDemo` (seeded demo data); timestamps
+- **Not stored:**
+  - `company` and `location` (derivable; rebuilt by `toFrontendJob`)
+  - per-user match fields (`fitLabel`, `matchedSkills`, `gapSkills`)
+  - a text index (search is substring matching today; decide when building the API)
+- **Indexes:** `jobId` (unique), `postedAt` (descending), `city`, `companyName`, `geo` (2dsphere). Each one serves an existing sort or filter.
+
+### Files
+- **New:** `backend/src/config/env.js` (validates variables, URL-encodes credentials, password-free log text), `backend/src/config/db.js`, `backend/src/models/Job.js`, `backend/src/seed/jobTransform.js`, `backend/src/scripts/seedJobs.js`, `backend/tests/jobs.test.js`.
+- **Modified:**
+  - `backend/package.json`: mongoose ^9.11.4, dotenv ^18.0.9, and the `seed:jobs` and `test` scripts.
+  - `backend/.env.example`: placeholders only.
+  - `README.md`, `PROGRESS.md`, `AI_NOTES.md`.
+- **Frontend:** no changes.
+
+### Seed design
+- Reads `ALL_JOBS` straight from the frontend file, so there's no second copy of the data.
+- Aborts without writing if the count isn't 120 or any record is invalid (field checks plus Mongoose `validate()`).
+- Uses `bulkWrite` upserts keyed on `jobId`. `postedAt`, `createdAt` and `updatedAt` are set only on insert, so a re-run doesn't refresh dates and reports honest counts.
+- Never deletes anything. `createIndexes()` only adds missing indexes. It always disconnects, including after errors.
+
+### Commands and results
+- `npm test` (backend, Node's built-in test runner): **11/11 passed**. Covers the 120-record source, schema validation, an exact round trip for every job, coordinates, filter fields, invalid and duplicate records being reported, upsert shape, URI encoding and password-free logs.
+- `npm run seed:jobs` run 1: source 120, invalid 0, **inserted 120**, updated 0, database 120 (demo 120).
+- `npm run seed:jobs` run 2: inserted 0, updated 0, **unchanged 120**, database 120. Re-running is safe.
+- Read-back from Atlas: 120 documents, **0 field mismatches** against the frontend data (excluding `postedAt`, which is frozen at insert), 0 coordinate mismatches. Indexes present as listed above.
+
+### Security
+- **`.env.example` was committed** (`d9eddd1`, pushed to `origin`) containing the real username and password-like and cluster values. Those values **differ** from the real `.env`, but the file now holds placeholders only.
+- `.env` is git-ignored. No credentials appear in the source code. Logs show only `user@cluster/db`.
+
+### Mistakes and fixes
+- The first seed run logged a Mongoose 9 deprecation warning for `validateSync()` (once per document). Switched to the async `validate()` (tests updated), and turned off the Node module-type notice in the npm script.
+
+### Remaining risks
+- `postedAt` is frozen at the first seed (2026-09-29 to 2026-10-24), so "Last 24 hours" and the aging filters will return fewer jobs as days pass. A date-refresh option would need approval.
+- The seed depends on the `frontend/` folder being next to `backend/`, which is fine in this repo.
+- The 5 `mockRecommendations` jobs aren't part of this collection.
+
+## Prompt #24: Atlas connection fix, Job model refactor, 500-job seed
+
+- **Date/time:** 2026-10-24, about 16:40–17:10 IST
+- **AI tool:** Claude
+- **Exact prompt:** the "# Task: Fix MongoDB Atlas Connection, Refactor Job Model, and Seed 500 Realistic Jobs" message:
+  - diagnose and fix the connection;
+  - rename the model to `job.model.js` with a multi-line, fully described schema;
+  - 500 realistic jobs across 7 stacks and Indian cities, with tests;
+  - a safe idempotent seed that reports the reconciliation first;
+  - frontend compatibility through a transform;
+  - read-back verification.
+  - Security constraints: credentials only in `.env`, never logged, no Atlas network changes, no deletes or drops. Out of scope: Jobs APIs, auth, Gemini, Redis/BullMQ, FCM.
+
+### 1. Connection diagnosis
+- **Root cause:** `src/server.js` never loaded `dotenv` and never called `connectDB()`. The connection code from Prompt #23 was only used by the seed script, so the running server was never connected.
+- **Fix:**
+  - `server.js` imports `dotenv/config` and awaits `connectDB()` (which pings) before `listen`.
+  - If the connection fails, it logs a redacted error and exits 1.
+  - `/health` now returns `database: connected|connecting|disconnecting|disconnected`, with 503 when the database isn't connected.
+  - `db.js` logs disconnected/reconnected/error events and shows only `user@cluster/db`.
+- **Verified:** server start, then `curl /health` → `{"status":"ok","database":"connected"}`.
+
+### 2. Model (`backend/src/models/job.model.js`; old `models/Job.js` deleted)
+- Every field is a multi-line object.
+- **Fields:**
+  - `jobId` (unique, `job-<city>-<n>` pattern), `title`, `category` (7-value enum)
+  - `companyName` / `companyIndustry` / `companyAbout`
+  - `area` / `city` / `state` / `country`; `latitude` / `longitude` (range-checked); GeoJSON `geo`
+  - `experience` (6-value enum), `jobType` (Full-time / Contract / Internship)
+  - `salary` sub-schema: `{ min, max ≥ min, currency INR, period year|month }`
+  - `postedAt`, `verified`, `requiredSkills`
+  - description sections: `summary`, `responsibilities` (≥3), `requirements` (≥3), `qualifications` (≥1), `niceToHave`
+  - `applyUrl` (http(s)), `isDemo`, timestamps
+- **Indexes:** `jobId` unique, `postedAt` −1 (newest/aging), `city` and `companyName` (filters), `geo` 2dsphere (distance sort).
+
+### 3. Dataset (`backend/src/data/`)
+- **Source files:**
+  - `cities.js`: 17 cities with real business-district coordinates.
+  - `companies.js`: 30 fictional companies.
+  - `roles.js`: 30 role templates with their own skills, responsibilities and requirements.
+  - `jobs.dataset.js`: a deterministic generator.
+- **Result:** 500 jobs.
+  - Categories: Frontend 68, Backend 100, Full Stack 65, Mobile 67, Data 68, Cloud & DevOps 66, QA & Testing 66.
+  - Job types: Full-time 435, Internship 51, Contract 14.
+  - 117 distinct titles; 500 distinct descriptions; 350 verified.
+  - Salaries rise with seniority; internships pay a monthly stipend.
+  - jobIds `job-blr-1…12` etc. are reused from the 120-job seed.
+
+### 4. Seed (`backend/src/scripts/seedJobs.js`)
+- Validates all 500 records (field checks + Mongoose `validate()`) and aborts without writing on any invalid record or a count other than 500.
+- Before writing, it prints the reconciliation: existing / will update / will insert / not in dataset (left untouched). `--dry-run` stops there.
+- `bulkWrite` upserts by `jobId`. `postedAt` and timestamps go in `$setOnInsert`; `$unset` removes the old `description` field from previous-format documents. It never deletes or drops, and always disconnects.
+
+### 5. Frontend compatibility (`backend/src/seed/jobTransform.js`)
+- `toFrontendJob()` returns `id`, `company`, `companyName`, `location` ("City, State"), `latitude`, `longitude`, `requiredSkills`, `salary` (display text such as "₹8–14 LPA" or "₹15k–25k / month") and `description` (markdown sections: About, The Role, What You'll Do, Requirements, Qualifications, Nice to Have, Required Skills).
+- No frontend files were changed; the app keeps its local mock jobs until a Jobs API exists.
+
+### Commands and results
+- `npm test` (backend): **20/20 passed**. Covers:
+  - size, ids, distinct listings and descriptions, determinism, legacy ids kept;
+  - every category/level/type present; skills consistent with role; salary ordering;
+  - schema validation of all 500; each job within 35 km of its city; district → city check;
+  - invalid and duplicate records reported; schema rejecting bad lat/enum/salary;
+  - transform fields; the frontend's own `validateJobs` and `parseDescription` on converted jobs;
+  - upsert shape; `reconcile()`; URI encoding.
+- `npm run seed:jobs -- --dry-run`: existing **0**, update 0, insert 500, untouched 0.
+- `npm run seed:jobs` run 1: source 500, invalid 0, **inserted 500**, updated 0, unchanged 0, database 500 (demo 500).
+- Run 2: inserted 0, updated 0, **unchanged 500**, database 500, so a re-run is safe.
+- **Atlas read-back:**
+  - 500 docs, 500 unique jobIds, all dataset ids present;
+  - 0 schema errors, 0 geo/lat-lng mismatches, 0 jobs more than 35 km from their city;
+  - 0 leftover `description` fields, 0 content differences;
+  - frontend `validateJobs` true on all 500 converted docs;
+  - indexes `_id_, jobId_1, postedAt_-1, city_1, companyName_1, geo_2dsphere`; a `$near` query around Bengaluru returns Bengaluru jobs.
+- **Secrets check:** `.env` is ignored and not tracked; the real password appears in no changed file.
+
+### Reconciliation
+- Earlier in this prompt, Atlas held 120 jobs. When the seed ran, `spire_db.jobs` held **0 documents**, because the user had deleted the 120 jobs on purpose (confirmed in Prompt #25). I reported it as an unexpected deletion, which was wrong.
+- Nothing was lost by seeding: all 120 old jobIds are part of the new dataset. They are new documents, though, so their old `postedAt` values weren't kept.
+- The other databases on the shared cluster were only listed (read-only) and not touched.
+
+### Mistakes and fixes
+- My summary of an earlier step treated a `count 120` from the frontend's `mockJobs.js` as the Atlas count. Checking the transcript found the real Atlas count (also 120) in a separate inspection, so the reconciliation plan was right at that time. The data then changed outside the session.
+- The Prompt #23 notes list a `geo` 2dsphere index as present, but before this seed the collection had no `geo_2dsphere` index. It exists now.
+- A temp log path (`../../spire_srv_tmp.log`) pointed at `D:\`. The safety check blocked an `rm` there and nothing was deleted; logs moved to the scratchpad.
+- To free port 5000 for the health check I stopped the process listening there. That may have been the user's own `npm run dev`, which will need restarting.
+- The first README edit script failed (CRLF line endings) before writing anything. It was re-run with line endings kept.
+
+### Remaining risks
+- `postedAt` is set once at insert (spread over the last 30 days), so "Last 24 hours" and aging counts will shrink (14 jobs were within 24 h at seed time).
+- The 500 jobs aren't visible in the app until the Jobs API is built.
+- The credential-like values in the already-pushed commit `d9eddd1` (reported in Prompt #23) are still in Git history.
+
+## Prompt #25: Verify the current state (no changes)
+
+- **Date/time:** 2026-10-24, about 17:15 IST
+- **AI tool:** Claude
+- **Exact prompt:** "The previous 120 jobs were intentionally deleted by me. The empty collection before seeding was expected. … Now verify the current state:"
+  1. 500 jobs in Atlas;
+  2. unique jobIds and required fields;
+  3. backend tests;
+  4. `/health` connected;
+  5. Git changes and a credential scan without printing secrets;
+  6. no deletes, no reseed, no frontend changes, no Jobs APIs.
+
+### Results
+- **Atlas (read-only):** `countDocuments` 500; 500 unique jobIds; duplicate-jobId aggregate 0. All 19 required schema paths are present on every document, 0 documents fail schema validation, and all 500 are `isDemo`.
+- **`npm test` (backend):** 20/20 passed.
+- **`/health`:** server started on port 5077 so the process already on 5000 wasn't touched → `{"status":"ok","database":"connected"}` (HTTP 200), then stopped. The existing server on 5000 also returns connected.
+- **Git:**
+  - 7 modified files; `backend/tests/jobs.test.js` staged (by the user); new backend folders untracked; nothing committed.
+  - `backend/.env` is ignored, and no `.env` file is tracked.
+- **Credential scan** (values compared, never printed):
+  - The real `DB_PASSWORD` and `DB_CLUSTER_URL` appear in no file and no commit.
+  - The real `DB_USERNAME` appears in history only, in commit `d9eddd1`.
+  - No `mongodb://user:pass@` URIs in the working tree.
+
+### Mistakes and fixes
+- In Prompt #24 I treated the deliberately emptied collection as an unexpected deletion and investigated it. Corrected in PROGRESS and the Prompt #24 notes.
+
+## Prompt #26: Containerize the backend and connect Redis
+
+- **Date/time:** 2026-10-24, about 18:20–18:50 IST
+- **AI tool:** Claude
+- **Exact prompt:** "## Current task: Containerize the backend and connect Redis":
+  - Dockerfile, plus docker-compose.yml with the backend API and the official Redis image;
+  - `REDIS_URL` configuration, using the service name (not localhost) inside Compose;
+  - no Redis install on Windows;
+  - health checks and readiness;
+  - `.dockerignore` / `.env.example`, with no secrets in the image;
+  - keep MongoDB Atlas and current behaviour; verify Atlas, Redis, `/health` and tests.
+  - Out of scope: Jobs APIs, frontend, caching/BullMQ/workers, production Compose, data changes.
+
+### Inspected first
+- **Backend:** Express 5 ESM; `server.js` connects MongoDB and then listens; config in `src/config/env.js` / `db.js`; `.gitignore` already ignores `.env`; no Docker files existed.
+- **Docker:** Docker 29.2.1 / Compose 5.1.0 were installed but the engine was stopped; I started Docker Desktop.
+
+### Changes
+- **New:** `backend/Dockerfile`, `backend/.dockerignore`, `backend/docker-compose.yml`, `backend/src/config/redis.js`, `backend/tests/redis.test.js`.
+- **Modified:**
+  - `backend/src/config/env.js`: `getRedisUrl`, `describeRedisTarget`.
+  - `backend/src/server.js`: connects Redis after MongoDB; `/health` adds `redis`.
+  - `backend/package.json` / `package-lock.json`: `redis` ^6.3.0.
+  - `backend/.env.example`: `REDIS_URL=` placeholder.
+  - README, PROGRESS, AI_NOTES.
+- **Dockerfile:** `node:22-alpine`; `npm ci --omit=dev`; copies only `src`; runs as `node` (non-root).
+- **Compose:**
+  - Project name `spire-ai`.
+  - `redis:8.2-alpine`, published on 127.0.0.1 only, health check `redis-cli ping`.
+  - Backend: `env_file: .env` (runtime only); `REDIS_URL=redis://redis:6379`; `depends_on` redis `service_healthy`; health check calls `/health` with Node's `fetch`; `init: true`.
+  - Host ports configurable through `BACKEND_HOST_PORT` / `REDIS_HOST_PORT`.
+- **Redis config:**
+  - `REDIS_URL` is optional so plain `npm run dev` behaves as before.
+  - When it's set, startup fails after 5 attempts if Redis is unreachable; after the first connection, the client reconnects with capped backoff.
+  - Logs show `redis://host:port` only, without credentials.
+
+### Verification (actually run)
+- `npm test` (backend): **22/22 passed** (20 existing + 2 new).
+- **Host run without `REDIS_URL`:** `{"status":"ok","database":"connected","redis":"not_configured"}` (HTTP 200), so existing behaviour is unchanged.
+- **Compose:**
+  - `docker compose config --quiet` valid; `docker compose up --build -d` (host port 5080, because 5000 was in use); both containers `(healthy)`.
+  - Logs: MongoDB connected → Redis connected (`redis://redis:6379`) → listening.
+  - `/health` from Windows: `{"status":"ok","database":"connected","redis":"connected"}`.
+  - PING from inside the backend container using hostname `redis`: PONG.
+- **Failure handling:**
+  - Redis stopped → `/health` 503 `redis: "connecting"`; restarted → "Redis reconnected", 200.
+  - Unreachable `REDIS_URL` at startup → "Redis connection failed: gave up after 5 attempts", exit 1.
+- **Host `npm`-style run with `REDIS_URL=redis://localhost:6379`** (Compose Redis): connected.
+- **Secrets:** `.env` absent from the image; image env has only PATH/NODE_VERSION/YARN_VERSION/NODE_ENV; the real password is in none of the new or changed files.
+- **MongoDB:** read-only count from inside the container: 500 jobs (unchanged).
+
+### Mistakes and fixes
+- **Compose project-name collision.**
+  - The first `docker compose up` used the default project name `backend` (the folder name). Another, unrelated Compose project of the user's also used `backend`, so Compose **recreated its two containers** (`backend-redis-1`, `backend-backend-1`) with mine, and my build took over its `backend-backend` image tag.
+  - **Fix:** set `name: spire-ai` in the Compose file, removed only the two containers I had created, and removed my `backend-backend:latest` tag so that project won't run my image.
+  - Its data volume `backend_redis-data` was never mounted or deleted. Running `docker compose up --build` in that project's folder recreates its containers.
+- The first fail-fast log line was an empty `Redis error:` because on Windows a refused `localhost` connection is an `AggregateError` with no message. The error text now falls back to the inner errors and codes.
+
+## Prompt #27: Production Dockerfile and production Compose
+
+- **Date/time:** 2026-10-24, about 19:00–19:25 IST
+- **AI tool:** Claude
+- **Exact prompt:** "prod docker file and prod compose is missing"
+
+### Decision
+- The Prompt #26 `Dockerfile` was already production-style but was used by the development Compose file. I split the setup into a clear pair:
+  - **Development:** `Dockerfile.dev` + `docker-compose.yml`.
+  - **Production:** `Dockerfile.prod` + `docker-compose.prod.yml`.
+- The old `Dockerfile` (uncommitted, from Prompt #26) was removed.
+
+### Changes
+- **New:**
+  - `backend/Dockerfile.prod`: `node:22.21.1-alpine`; a deps stage runs `npm ci --omit=dev`; the runtime stage copies `node_modules`, `package.json` and `src` owned by `node`, runs as `USER node`, and has a HEALTHCHECK on `/health`.
+  - `backend/Dockerfile.dev`: `npm ci` with dev deps; `npx nodemon --legacy-watch` (polling, because bind-mount events from Windows don't reach the container).
+  - `backend/docker-compose.prod.yml`:
+    - Project `spire-ai-prod`.
+    - Redis `8.2.10-alpine` with `--requirepass` from `REDIS_PASSWORD` (required: `${REDIS_PASSWORD:?…}`), `--appendonly yes`, `redis-data` volume, no published port, health check using `REDISCLI_AUTH`.
+    - Backend: `REDIS_URL=redis://:<password>@redis:6379`; `depends_on` healthy Redis; `read_only` + `tmpfs /tmp`; `init`.
+    - Both: `restart: always`, memory limits (512m / 256m), json-file log rotation.
+- **Modified:**
+  - `backend/docker-compose.yml`: `Dockerfile.dev`, `./src` mounted read-only, Redis pinned to `8.2.10-alpine`.
+  - `backend/.dockerignore`: `Dockerfile*`, `docker-compose*.yml`.
+  - `backend/.env.example`: `REDIS_PASSWORD=` placeholder.
+  - README (development and production sections plus a comparison table), PROGRESS, AI_NOTES.
+
+### Verification (actually run)
+- `docker compose config --quiet` is valid for both files. The production file without `REDIS_PASSWORD` fails with "Set REDIS_PASSWORD in backend/.env".
+- **Development:**
+  - Both containers `(healthy)`; `/health` → `{"status":"ok","database":"connected","redis":"connected"}`; `NODE_ENV=development`, nodemon present.
+  - `touch src/server.js` → "[nodemon] restarting due to changes", then healthy again.
+- **Production** (random `REDIS_PASSWORD` set only in the shell, never written or printed):
+  - Both containers `(healthy)`; `/health` → connected/connected; logs show `redis://redis:6379` without the password.
+  - Port 6379 closed on the host.
+  - `redis-cli ping` without auth → `NOAUTH Authentication required.`; with auth → PONG; `appendonly yes`.
+  - Backend: user `node`, `NODE_ENV=production`, nodemon absent, writing to `/app` → "Read-only file system".
+  - `docker inspect`: restart=always, memory 512 MB / 256 MB, log max-size 10m.
+  - Image `spire-ai-backend:prod` is 266 MB, with only PATH/NODE_VERSION/YARN_VERSION/NODE_ENV in its env; the password appears 0 times in the image metadata.
+  - After `restart redis`, the backend reconnected (200).
+  - The test stack was removed with `down -v` (its volume was created only for this test; I checked that no `spire-ai-prod` resources existed before).
+- `npm test` (backend): 22/22.
+
+### Limitations
+- Single host only; no HTTPS or reverse proxy yet.
+- The Redis password is an environment variable, so anyone with `docker inspect` access on the host can see it. Docker secrets or a secrets manager would be the next step.
+- `restart: always` restarts the production stack whenever Docker starts, until it's taken down.
+
+## Prompts #28 (Part 1) and #28: All Jobs architecture discussion and requirements review (analysis only)
+
+- **Date/time:** 2026-10-24, about 19:30–20:00 IST
+- **AI tool:** Claude
+- **Exact prompts:** "I want to have a detailed technical architecture discussion about a scalability problem…" and "We are preparing to make the existing 'All Jobs' tab fully dynamic… This is a review and requirements-discovery task ONLY."
+- **Read only:** both prompts forbade file changes, so nothing was logged at the time. This entry was added with Prompt #29.
+- **Findings used later:**
+  - the app sent every job to the phone and clustered on the device;
+  - the map had no viewport events;
+  - filter counts were global;
+  - `postedAt` is frozen at seed time;
+  - an API contract with list, details, summary, filter options and map endpoints.
+
+## Prompt #29: All Jobs API development, integration and testing
+
+- **Date/time:** 2026-10-24, about 20:00–22:00 IST
+- **AI tool:** Claude
+- **Exact prompt:** "# Task: Complete All Jobs API Development, Integration & Testing", with two reference screenshots of the map loading state.
+  - Backend endpoints; server-side clustering with MongoDB aggregation; map loading shimmer matching the screenshots; infinite scroll with shimmer; filters, search and sort preserved; Job Details by id; reliability; backend and frontend tests; final verification.
+  - **Rules:** preserve the UI, no AI ranking, don't change `postedAt`, don't touch the 500 records, no secrets in logs.
+
+### Backend
+- **New:**
+  - `src/app.js`: `createApp()`; `server.js` now only connects and listens.
+  - `src/routes/jobs.routes.js`: five GET endpoints; 503 while MongoDB isn't connected.
+  - `src/services/jobQuery.js`: validation (unknown parameters, ranges, enums, repeated scalars, bbox, zoom, job id) and the shared `buildJobFilter`. Search is a literal, case-insensitive regex over title, company, area, city, state and skills.
+  - `src/services/jobs.service.js`:
+    - list via `find` with sort `postedAt -1, _id -1` plus skip/limit, or `$geoNear` for distance;
+    - `countDocuments` for the total;
+    - `$facet` for filter options;
+    - a `$group` grid for map clusters (cell = 360/2^zoom × 64/256 degrees);
+    - every query has an 8 s `maxTimeMS`.
+  - `src/utils/httpErrors.js`, `src/utils/geo.js`, `tests/jobsApi.test.js` (33 tests).
+- **Modified:** `src/seed/jobTransform.js` gains `toJobCard` and `CARD_FIELDS`; `package.json` adds the dev dependency `mongodb-memory-server` ^11.3.0.
+- **bbox matching:** exact latitude/longitude ranges, plus a `$geoWithin` polygon expanded by 0.01° and split into ≤1° segments, so great-circle edges never cut off jobs and the 2dsphere index is used. Tests check edge points and the query plan.
+- **No new indexes.** At 500 documents the existing ones are enough; a compound `{postedAt:-1,_id:-1}` is the first candidate at scale.
+
+### Frontend
+- **New:**
+  - `config/api.js` (`EXPO_PUBLIC_API_URL`);
+  - `services/jobsService.js` (fetch with abort + 15 s timeout, `ApiError`);
+  - hooks `useRemoteData` (latest-only, debounce, keeps old data), `useJobList` (infinite scroll), `useDebouncedValue`;
+  - pure, Node-testable `utils/remoteData.js`, `jobPages.js`, `latestRequest.js`, `jobQueryParams.js`;
+  - `components/Skeleton.js` (pulse skeleton, `LoadingDots`, `JobListItemSkeleton`);
+  - `tests/allJobs.test.mjs` (20 tests).
+- **Modified:**
+  - `JobsMap.js`: markercluster plugin removed (no client clustering); viewport events on `moveend`; `setMarkers` for server clusters and points; `zoomToBounds` / `fitToBounds`. Same pin and cluster styles.
+  - `OpportunitiesScreen.js`: API data for map, summary, list, preview, filter options and companies; cluster card uses the server's count, company count and bounds; "View list" filters by the cluster bounds.
+  - `FilterSheet.js`: optional server options and counts; local mode kept for Recommended.
+  - `CompanySheet.js`: server company counts.
+  - `JobDetailsScreen.js`: fetches by `jobId` when given, merges with the passed card; description skeleton, retry, and "no longer available" for 404.
+  - `errors.js`: `ApiError`. `.env.example`: `EXPO_PUBLIC_API_URL`. `mockMap.js`: comment.
+- **Loading design:**
+  - *Cold start:* skeleton chip pills, dots pill and bottom skeleton pill, as in the reference.
+  - *Later map requests:* dots pill + bottom skeleton; chips and markers stay. Keeping the chips usable is my interpretation of "preserve filter controls".
+  - *Failure:* stops the shimmer and shows a retry pill.
+
+### Verification (actually run)
+- Backend `npm test`: **55/55**. Frontend `npm test`: **20/20**. `expo export --platform android`: built. `expo-doctor`: 20/20.
+- **Real API against Atlas (read-only):** list total 500, page 25 `hasMore:false`; map zoom 5 → clusters totalling 500; summary `verified+last24h` 9; aging counts 13/115/500; details; 400 and 404 responses; distance sort (nearest Bengaluru jobs 1.0–1.5 km).
+- **Emulator** (new backend on a spare port, plus a test-only delaying proxy to make loading states visible):
+  - cold-start skeleton;
+  - zoom → dots pill + bottom skeleton with markers kept;
+  - map 503 → retry pill, shimmer stopped; retry recovered;
+  - Hyderabad cluster → 50 jobs / 30 companies → View list showed exactly 50;
+  - Show all → 500; infinite scroll with footer shimmer; next-page error + retry (re-requested page 4 only);
+  - Job Details skeleton → API description;
+  - Last 24 hours → View jobs (13);
+  - All Filters Pune 45 → Show 45 jobs → map fit to Pune.
+- All test processes were stopped afterwards. The user's own servers on 5000/8081 were not touched.
+
+### Mistakes and fixes
+- `ListEmptyComponent` / `ListFooterComponent` first returned arrays, which FlatList treats as a component type. Wrapped them in fragments before running.
+- A Mongoose 9 pipeline update in a test needed `{ updatePipeline: true }` (1 failing test, fixed).
+- Emulator network throttling didn't reliably slow host traffic, so the shimmer wasn't caught at first. Switched to a scratchpad delaying proxy.
+
+### Limitations
+- Grid clusters can overlap visually at cell edges; the counts stay exact.
+- No AI ranking: "Recommended" is newest-first.
+- Search is a regex scan (fine at 500; at scale use Atlas Search).
+- The `total` count runs on every list page.
+- A backend process started before this prompt must be restarted to serve the API.
+
+## Prompt #30: "Couldn't load jobs" on the map (bug fix)
+
+- **Date/time:** 2026-10-24, about 22:10–22:30 IST
+- **AI tool:** Claude
+- **Exact prompt:** "there is something went wrong can you test again because the dat is is not coming it should couldn't load the job on the map its showing can you check what is the problem here??"
+- **Checked:**
+  - The backend on :5000 (now the Docker dev stack) served `/api/jobs/map` correctly from the computer.
+  - The emulator reached `10.0.2.2:5000` and the app worked there.
+  - The user tests on a **physical phone**.
+- **Root cause (my mistake in Prompt #29):** without `EXPO_PUBLIC_API_URL`, `config/api.js` defaulted to `http://10.0.2.2:5000` on every Android device. That address only exists inside the emulator, so on a real phone every API request failed, and the map showed the retry pill.
+- **Fix:** `config/api.js` now takes the host from the Expo dev server the app was loaded from (`expo-constants` `expoConfig.hostUri`, e.g. 10.113.98.185:8081 → :5000). `localhost`/127.0.0.1 becomes 10.0.2.2 on Android. `EXPO_PUBLIC_API_URL` still overrides. `expo-constants` ~58.0.13 was added to `package.json` via `expo install` (it was already installed through Expo).
+- **Verified:**
+  - backend health on the Wi-Fi address 10.113.98.185:5000;
+  - Windows Firewall allows "Docker Desktop Backend" on the Public (Wi-Fi) profile;
+  - app loaded on the emulator from `exp://10.113.98.185:8081` (the phone's path) → View jobs (500), no error;
+  - loaded from `exp://127.0.0.1:8081` → also works;
+  - frontend tests 20/20, `expo-doctor` 20/20, Android export built.
+  - Not verified on the physical phone itself (no access).
+
+## Prompts #31–#32: Map markers like the reference (company bubbles + numbered pins)
+
+- **Date/time:** 2026-10-24, about 22:30–23:15 IST
+- **AI tool:** Claude
+- **Exact prompts:** "can you show the jobs like this that is more menaing full did you get what i am trying to tell ??" (screenshot), then "no you missunderstood you understood wrong that we need to show when we are doing the zoom … now are you able to understood" (two screenshots).
+- **First attempt (Prompt #31, my mistake):** I made every marker a white bubble labelled with the cluster's top company ("Bluepeak Labs +19 more"). The user reverted it. The reference actually has two kinds of marker that change with zoom: blue numbered pins for groups, and white company bubbles (briefcase + job count + company name) for single offices.
+- **Implemented (Prompt #32):**
+  - `getMapData` groups jobs per (cell, company + area + city), then per cell. One office → `offices[]` (count, companyName, area, city, bounds, jobId when 1 job); several → `clusters[]` (officeCount, companyCount, bounds).
+  - The points mode and `mode` field were removed.
+  - `/summary` returns `companyCount`.
+  - **Frontend:**
+    - `JobsMap` draws blue numbered pins and white company bubbles; a one-job office opens the job preview, and a selected bubble turns blue.
+    - The office card shows "N jobs at Company · Area, City", and "View list" filters by bbox + company.
+    - "View companies (N)" now shows the count.
+- **Verified:**
+  - backend `npm test` 56/56: every marker is checked against an independent grouping at zoom 6/9/12/15; zooming splits clusters; "View list" exactness for clusters and offices; summary `companyCount`;
+  - frontend `npm test` 20/20; Android export built;
+  - on the emulator: India view shows numbered pins (Bengaluru 69) with "View companies (30)" / "View jobs (500)"; the Bengaluru card "70 jobs in this area · 30 companies"; zoom in → smaller pins and bubbles such as "1 Granite Insurance".
+- **Note:** with the demo dataset most company offices have 1 job, so bubbles often show "1". Real data with many jobs per office gives larger counts, like the reference.
+
+## Prompt #34: Phase 1 resume upload and profile processing
+
+- **Date/time:** 2026-10-24, about 20:00–23:15 IST
+- **AI tool:** Claude
+- **Exact prompt:** "# Final Implementation Prompt — Phase 1 Resume Upload & Profile Processing" (upload → storage → BullMQ → text extraction → Gemini → polling → confirm → save + download; PDF/DOCX ≤ 5 MB; guest session ownership; confirm-before-replace; Retry without manual bypass; no recovery across restarts; cleanup; tests).
+
+### Built
+- **Backend:**
+  - `routes/resumes.routes.js`: 5 endpoints; `X-Guest-Session` UUID, stored only as a SHA-256 hash; 404 for anyone else's data.
+  - `services/resumes.service.js`: idempotent upload, status, retry, confirm (deletes the superseded resume), download, cleanup.
+  - `models/resume.model.js`; `storage/resumeFiles.js` (GridFS).
+  - `services/resumeFile.js` (content checks, safe names), `resumeText.js` (unpdf / mammoth), `gemini.js` (@google/genai interactions API with a JSON schema; `maxRetries: 0`, 60 s timeout), `resumeProfile.js` (server-side validation), `resumeErrors.js`.
+  - `queue/resumeQueue.js` (BullMQ + ioredis), `workers/resumeWorker.js`, `worker.js` (worker + 15-minute cleanup).
+  - `worker` service in both Compose files; `GEMINI_MODEL` in `.env.example`.
+- **Frontend:**
+  - Utilities and hooks: `utils/resumeProcessing.js`, `hooks/useResumeProcessing.js`, `storage/guestSession.js`.
+  - `services/resumeService.js` (real API), `storage/resumeFiles.js` (staging only).
+  - Screens:
+    - Processing: real stages, Retry / Choose another, no manual bypass.
+    - ResumeConfirm: validation; nothing replaced on continue.
+    - ProfileConfirm: confirms on the server, then one `profileConfirmed` action.
+    - Profile: real PDF/DOCX label; download + share for guests.
+  - Mock parser removed; mock recommendations no longer triggered (the service reports "coming soon").
+
+### Verification
+- **Tests:** backend `npm test` 90/90; frontend `npm test` 33/33; `expo export` built; `expo-doctor` 20/20.
+- **Live run** (Docker API + worker + Redis + Atlas + **real Gemini `gemini-3.5-flash-lite`**):
+  - PDF: queued → extracting_text → analyzing → completed in about 11–23 s; correct profile; confirm 200; download identical bytes; other guest 404.
+  - DOCX completed; renamed text file 415; text-less PDF `no_text`.
+  - The test records were deleted afterwards.
+- **Not done:** an emulator walk-through of the app screens with a real file (skipped for time).
+
+### Mistakes and fixes
+- **Lock file:** `npm ci` in Docker failed because MongoDB's optional peer `gcp-metadata@^7` conflicts with the Gemini auth library's v8. Fixed with `overrides`, verified with a clean `npm ci` in `node:22.21.1-alpine`.
+- **BullMQ 6:** it needs a constructed `ioredis` client in ESM (the worker logged warnings). Added `ioredis@6.0.0`.
+- **Experience years:** Gemini first computed 4 y 0 m for jobs running to "present" (about 6 y 4 m). The prompt now includes the current month; the re-run gave 6 y 4 m.
+- **Shell editing:** an inline shell edit was mangled by bash backticks; it was caught by reading the result and fixed with the Edit tool.
+- **Old bug fixed:** the backend container became unhealthy after the source changes (old image without the new packages); fixed by rebuilding.
+
+## Prompt #35: "its not working test onece again" (bug fix)
+
+- **Date/time:** 2026-10-24, about 23:00–23:15 IST
+- **AI tool:** Claude
+- **Checked:** backend, worker and Redis were healthy, and the database had **no** uploads from the app, so the request never left the device.
+- **Reproduced on the emulator:** Profile → Replace resume → PDF → "Couldn't reach the server".
+- **Root cause (my mistake in Prompt #34):** Expo SDK 58 replaces the global `fetch` with `expo/fetch`, whose FormData does not support React Native's `{ uri, name, type }` file parts. The upload threw before any request was sent. The unit tests run in Node, so they could not catch it, and the Prompt #34 live test used Node fetch, not the app.
+- **Fix:**
+  - `resumeService.submitResume` appends an expo-file-system `File` (a Blob), which `expo/fetch` supports.
+  - Also found: an upload whose queue job was lost (the API restarted between saving it and queueing it) stayed `queued` forever. Retry on a `queued` job now re-adds the same queue job id (a no-op if it exists), and the worker re-queues uploads stuck for more than 5 minutes (every 5 minutes). Tests added; backend 91/91.
+  - The staged copy keeps its real file name in its own folder, so the upload's file name is right.
+  - The backend decodes percent-encoded file names (expo/fetch encodes them) before cleaning them; tests added.
+- **Verified on the emulator:**
+  - upload → processing → ProfileConfirm pre-filled by real Gemini (name, email, phone, role, location, 6 y 4 m);
+  - save → Profile card shows "Asha_Resume.pdf" / PDF;
+  - Download → share sheet with the file;
+  - server: the record is confirmed.
+- **Tests:** backend 91/91, frontend 33/33.
+
+## Prompt #41: Guest job recommendations (end to end)
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Exact prompt:** "Implement the complete guest-only job recommendation flow …" (minimal matching profile; BullMQ/Redis; candidates from MongoDB, Gemini ranks only real jobs; persisted status/results; Recommended screen on the real API; deferred on quota; regeneration; retry; recovery; no login/FCM/dev build now).
+
+### Built
+- **Backend:**
+  - `middleware/owner.js`: `requireOwner` / `requireDatabase` moved out of the resume routes and shared.
+  - `services/matchingProfile.js`: whitelist + version hash.
+  - `models/recommendation.model.js`: lifecycle `queued → processing → completed`, plus `deferred`, `failed`, `superseded`; unique `{ownerKey, profileVersion}`.
+  - `services/jobMatching.js`: skills / title / location / experience scoring, top 30, calculated matched and gap skills.
+  - `services/geminiQuota.js`: shared Redis guard, optional `GEMINI_RPM/TPM/DAILY_BUDGET` (nothing assumed), circuit breaker, retry hints, daily quota → next midnight Pacific.
+  - `services/gemini.js`: `createJobRanker` (JSON schema; the original error is kept for the guard).
+  - `queue/recommendationQueue.js` (job id `rec-<id>-<run>`, jittered backoff); `services/recommendations.service.js` (ensure / current / retry / maintenance + 30-day retention); `workers/recommendationWorker.js`; `routes/recommendations.routes.js`.
+  - `worker.js` runs both workers, the shared guard and a 30-second maintenance sweep. The resume worker uses the guard too.
+- **Frontend:**
+  - `utils/recommendations.js` (matching profile, state mapping, view, polling); `services/guestApi.js` (shared guest request) + `recommendationService.js` (real API).
+  - `store/profileSlice.js` (sync / refresh / retry thunks, guarded against stale responses); `store/recommendationSync.js` (listener: regenerate on matching changes, recover at start-up); `hooks/useRecommendationPolling.js`.
+  - `RecommendedScreen` and `RecommendationStatus` (deferred state).
+
+### Verified
+- **Tests:** backend 119/119 (+28), frontend 27/27 (+7), Android export built, `expo-doctor` 20/20.
+- **Live** (Docker stack, real `gemini-3.5-flash-lite`):
+  - POST 202, repeat 200 (same record) → selecting_jobs → ranking → completed in about 13 s; 10 ranked real jobs; other guest `none`;
+  - stored record has only the 8 matching fields (no name or email). The test record was deleted afterwards.
+- **Emulator, cold start:** the Recommended tab recovered **15** ranked jobs from the server (fit labels, Match/Gaps); Job Details shows Excellent Fit, Exact Match (6) and the full API description.
+
+### Not verified live
+- A real 429 or daily-quota response from Gemini (covered by tests with faked errors).
+- Regeneration triggered from the Profile edit screens on the device (covered by unit and API tests).
+- Physical phone.
+
+### Mistakes and fixes
+- Two candidate-selection test assertions were too strict: React Native and MERN jobs legitimately share JavaScript, Redux and TypeScript. The assertions were corrected; the scoring is unchanged.
+
+## Prompt #42: Recommendations wrong after uploading different people's resumes
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Exact prompt:** "no recomendation is now working properly check with the multiple resumes first upload different person resume the see therecomedation then differnt person did you get then anlyse what hapneing my prefiel belongs to mernstack its giving me recomndation for java also and in my skills i have the rect but its showing gap test this things properly did you get"
+
+### Root causes (found in the stored data)
+1. `frontend/src/utils/profileMerge.js` **unioned** skills and experiences across resumes, so a MERN profile still had the previous Java person's skills and titles. The matcher correctly picked Java jobs for them.
+2. Skills were compared as exact strings: "React.js" on a resume did not equal "React" in a job, so React showed as a gap.
+3. Generic title words ("developer", "engineer", "software") matched every job, and results computed under the old rules were reused from the cache.
+
+### Fixes
+- `profileMerge.js` rewritten: a new resume replaces skills, role, company, location and experience duration, plus the resume's experience and education entries. Entries added by hand are kept; contact details fall back to the existing ones only when the resume has none.
+- `jobMatching.js`: `skillKey` normalisation (punctuation, `.js` suffix, aliases such as Redux Toolkit → Redux, REST API Design → REST APIs) and title stop words.
+- `matchingProfile.js`: `MATCHING_RULES_VERSION = 2` is part of the profile version, so old cached results are regenerated.
+
+### Verified
+- **Tests:** backend 121/121, frontend 30/30. New tests: different-person merge, resume spellings vs job spellings, MERN profile → no Java roles.
+- **Live** (Docker stack, real Gemini), one guest session uploading MERN → Java → Data analyst → MERN resumes, using the app's own merge code:
+  - MERN → MERN/Node/React roles, React never a gap, no Java/Spring;
+  - Java → Java/Spring roles;
+  - Data → Data Analyst roles, no carried-over skills;
+  - the second MERN run matched the first.
+- The test guest's resume, GridFS file and 3 recommendations were deleted afterwards.
+
+### Mistakes and fixes
+- My Prompt #12 merge design (union of skills) assumed the same person re-uploads. It broke as soon as a different person's resume was uploaded. It now replaces the resume-derived data instead.
+- A profile already saved on the device keeps the old merged skills until the resume is re-uploaded or the skills are edited.
+
+## Prompt #43: Final end-to-end verification on the Android emulator
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Exact prompt:** "Now perform the final end-to-end verification on the Android emulator using the actual app UI and the running backend. …" (resume upload → confirmation → recommendations → Recommended screen; use the existing MERN resume; React matching, no Java for MERN, no old skills after replacement; restart, loading/deferred/empty/error states; logs; tests; no code changes unless a reproducible bug; report PASS / FAIL / NOT VERIFIED).
+
+### What was done
+- The user's MERN resume was copied from GridFS to the emulator. A fictional Java resume (Ravi Kumar) was generated for the replacement test.
+- In the app UI: Profile → Replace resume → Java resume → confirm, then Recommended. Next: Replace resume → MERN resume → confirm, then Recommended. Then Job Details, a force-stop and relaunch, and the backend stopped and started again.
+
+### Results
+- **PASS:**
+  - Java replacing the earlier Asha test profile removed all of its skills (React, Node.js, MongoDB…); Java resume → Java/Spring jobs.
+  - MERN replacing Java: no Java skills left. Results: 15 MERN/MEAN roles, React never a gap, 0 Java/Spring roles; Job Details shows Exact Match (6) incl. React.
+  - Loading state ("Agent Sigma is on the hunt") shown; results stay the same after the app restart, and no duplicate record was created.
+  - Backend down → "Something went wrong" + Try again → recovered after the backend restarted.
+  - Stored record holds only the 8 matching fields.
+  - Logs: no app or backend errors during the test.
+  - Tests: backend 121/121, frontend 30/30.
+- **NOT VERIFIED in the UI:** the deferred state (no real Gemini quota error available) and the empty state (would need fake profile data). Both are covered by automated tests only.
+- No bug found, so no code was changed.
+
+### Notes
+- Recommendations are not cached on the device. With the backend down, the tab shows the error state instead of the earlier results.
+- The emulator's guest profile now holds the user's MERN resume data.

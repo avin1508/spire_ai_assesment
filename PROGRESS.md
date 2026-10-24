@@ -1,7 +1,7 @@
 # Progress
 
 **Current phase:** Phase 2: UI development — Recommended jobs UI and resume-to-recommendations flow (waiting for review)
-**Current prompt:** #22
+**Current prompt:** #23
 **Last updated:** 2026-10-24
 
 ## Locked feature scope
@@ -62,8 +62,54 @@ The core assessment requirements come first. Other features must not break them.
 - [x] Apply requires login for guests on every job (Prompt #17)
 - [x] **Phase A — guest device storage** (Prompt #22): profile, skills, experience, education and resume details saved in AsyncStorage (guest namespace); resume file copied into the app's document folder; missing-file and corrupt-data handling; re-upload keeps manual and edited entries; 25 unit tests (`npm test`); emulator scenarios D1–D6 plus regression passed
 
+- [x] **Backend: Job model and seed** (Prompt #23): Mongoose `Job` schema from the frontend job records, conversion layer, idempotent `npm run seed:jobs`; 120 jobs seeded into MongoDB Atlas `spire_db.jobs`; 11 backend tests (`npm test`)
+- [x] **Backend: Atlas connection fix, Job model refactor, 500 jobs** (Prompt #24):
+  - `server.js` now loads `.env` and connects (with a ping) before it listens; `/health` reports the database state.
+  - The model is now `src/models/job.model.js`: full description sections, company info, structured salary, GeoJSON + 2dsphere index. The old `models/Job.js` was removed.
+  - A deterministic 500-job dataset (7 categories, 17 cities).
+  - The seed has a reconciliation report and `--dry-run`.
+  - 500 jobs in `spire_db.jobs`; 20 backend tests.
+
+- [x] **Backend containerization + Redis connection** (Prompt #26):
+  - `Dockerfile`, `.dockerignore`, and `docker-compose.yml` (project `spire-ai`) with the backend plus `redis:8.2-alpine`, health checks, and the backend waiting for a healthy Redis.
+  - The backend connects to Redis through `REDIS_URL` (optional) using the `redis` client.
+  - `/health` reports `redis`.
+  - 22 backend tests.
+
+- [x] **Production Docker setup** (Prompt #27):
+  - `Dockerfile.prod`: multi-stage, production deps only, non-root, HEALTHCHECK.
+  - `docker-compose.prod.yml` (project `spire-ai-prod`): Redis with a password, not published, persisted with AOF; read-only backend filesystem; restart always; memory limits; log rotation.
+  - The development setup now uses `Dockerfile.dev` (nodemon, `./src` mounted). The old `Dockerfile` was replaced.
+
+- [x] **All Jobs API + integration** (Prompt #29):
+  - **Backend:** `/api/jobs` (list, page/limit/total/hasMore), `/api/jobs/map` (MongoDB grid clustering per zoom), `/api/jobs/summary`, `/api/jobs/filter-options`, `/api/jobs/:jobId`, with validation and 400/404/503 JSON errors.
+  - **Frontend:** All Jobs uses the API (no mock fallback): map viewport events, server clusters, infinite scroll, details by id, and map/list shimmer.
+  - **Tests:** backend 55, frontend 20.
+
+- [x] **Phase 1: resume upload → profile** (Prompt #34):
+  - **Backend:** upload API, GridFS storage, BullMQ worker, PDF/DOCX text extraction, Gemini (`GEMINI_MODEL`), status / retry / confirm / download, cleanup.
+  - **App:** real processing screen, confirm-before-replace, guest session id, resume download.
+  - **Tests:** backend 90, frontend 33.
+
+- [x] **Job recommendations, guest flow** (Prompt #41):
+  - Minimal matching profile stored on the server (no personal data); BullMQ `recommendations` queue + worker.
+  - Candidate selection from the 500 real jobs, then Gemini ranking (validated: only real candidate ids).
+  - Shared Gemini quota guard in Redis (optional RPM/TPM/daily limits, circuit breaker, 429 → deferred, daily quota → after midnight Pacific).
+  - Regeneration on matching-profile changes; recovery after app restart.
+  - Tests: backend 119, frontend 27.
+- [x] **Fix: wrong recommendations after uploading a different person's resume** (Prompt #42):
+  - New resume replaces resume-derived skills, role and experience; manual entries kept.
+  - Skill spellings normalised ("React.js" = "React", "Node.js" = "Node"), so known skills are no longer gaps.
+  - Generic title words ("developer", "engineer") no longer match unrelated roles; rules version in the hash forces fresh results.
+  - Tests: backend 121, frontend 30. Live: MERN → Java → Data → MERN resumes in one guest session, all checks pass.
+- [x] **Emulator end-to-end verification** (Prompt #43):
+  - Passed: Java → MERN resume replacement in the app UI, recommendations, React matching, restart, loading and error/recovery states.
+  - Deferred and empty states not verified in the UI (tests only).
+
 ### In progress
-- [ ] Review of Phase A (waiting for approval before Phase B)
+- [ ] Review of the All Jobs API integration (Prompt #29)
+- [ ] Review of the Docker + Redis setup (Prompts #26–#27)
+- [ ] Review of the Job model refactor and 500-job seed (Prompt #24)
 - [ ] Review of Prompts #14–#15
 - [ ] Finish verifying Prompt #14: pin preview, list view, search and filters on the map, current location
 
@@ -108,8 +154,24 @@ The core assessment requirements come first. Other features must not break them.
 | 2026-10-24 | Sort and filter sheets (Prompt #10) on emulator | Passed: Sort sheet and Fitment order; All Filters sections; Location multi-select + search; Company search; apply → Recommended (3) / All Filters (1); selections kept on reopen; Verified, Last 24 hours, search, no-match + Clear filters; other tabs open; expo-doctor 20/20 |
 | 2026-10-24 | Job Details (Prompt #11) on emulator | Passed: correct job shown; long description scrolls with a fixed Apply button; guest locks and sign-up prompts; Back keeps filters; no-URL and no-description states; signed-in: no locks, Learning link, Apply opens the URL (Chrome then crashed on its own first run). Not testable: opening from All Jobs (no job list) |
 | 2026-10-24 | Profile, Experience and Education (Prompt #12) on emulator | Passed: empty state → simulated flow → back to Profile; layout matches the references; Experience list, edit mode, add with validation, delete; Education add; edit profile and replace resume return to Profile; Jobs shows Recommended (5); no errors |
+| 2026-10-24 | Backend `npm test` (Prompt #24) | Passed: 20/20 |
+| 2026-10-24 | Server start + `curl /health` (Prompt #24) | Passed: `{"status":"ok","database":"connected"}` |
+| 2026-10-24 | `npm run seed:jobs -- --dry-run`, then seed twice (Prompt #24) | Passed: dry run showed 0 existing / 500 to insert. Run 1: inserted 500, invalid 0. Run 2: inserted 0, updated 0, unchanged 500; total 500 |
+| 2026-10-24 | Atlas read-back (Prompt #24) | Passed: 500 docs, 500 unique jobIds, 0 schema errors, geo matches lat/lng, all within 35 km of their city, content matches the dataset, frontend `validateJobs` accepts all 500 converted jobs, 2dsphere `$near` query works |
+| 2026-10-24 | State check (Prompt #25) | Passed: Atlas 500 jobs, 500 unique jobIds, 0 duplicates, 0 missing required fields, 0 schema errors; backend `npm test` 20/20; `/health` → `{"status":"ok","database":"connected"}`; no credentials in the working tree |
+| 2026-10-24 | Docker Compose stack (Prompt #26) | Passed: `docker compose config` valid; image built; redis and backend both `(healthy)`; `/health` from host → `{"status":"ok","database":"connected","redis":"connected"}`; backend container PING via hostname `redis` → PONG; `.env` not in image, no DB_* in image env; Atlas count still 500 |
+| 2026-10-24 | Redis failure handling (Prompt #26) | Passed: Redis stopped → `/health` 503 `redis: "connecting"`; Redis restarted → client reconnected, 200. Unreachable `REDIS_URL` at startup → exits 1 after 5 attempts. Host run without `REDIS_URL` → `redis: "not_configured"`, 200; host run with `redis://localhost:6379` → connected |
+| 2026-10-24 | Backend `npm test` (Prompt #26) | Passed: 22/22 |
+| 2026-10-24 | Development Compose (Prompt #27) | Passed: both containers (healthy); `/health` connected/connected; `NODE_ENV=development`; touching `src/server.js` → nodemon restarted, then healthy again |
+| 2026-10-24 | Production Compose (Prompt #27) | Passed: missing `REDIS_PASSWORD` → Compose refuses; with a password both containers (healthy); `/health` connected/connected; Redis port not reachable from the host; `redis-cli ping` without a password → NOAUTH, with it → PONG; appendonly yes; backend runs as `node`, read-only filesystem, no nodemon, `NODE_ENV=production`; restart=always, memory limits and log rotation applied; recovered after a Redis restart; password not in the image |
+| 2026-10-24 | Backend `npm test` (Prompt #27) | Passed: 22/22 |
 | — | iOS device or simulator | **Not tested** (no macOS available) |
 | — | Physical Android device | **Not tested** |
+| 2026-10-24 | Backend `npm test` (Prompt #29) | Passed: 55/55, including 33 API integration tests on in-memory MongoDB with the 500-job dataset |
+| 2026-10-24 | Frontend `npm test` (Prompt #29) | Passed: 20/20 (loading/shimmer rules, stale responses, paging, params) |
+| 2026-10-24 | `expo export --platform android`, `expo-doctor` (Prompt #29) | Passed: bundle built; 20/20 |
+| 2026-10-24 | Real API against Atlas (read-only, Prompt #29) | Passed: list 500 / 25 pages, map zoom 5 → clusters totalling 500, last24h total 13, details, 400/404 errors, distance sort |
+| 2026-10-24 | Emulator, All Jobs with the real API (Prompt #29) | Passed: <ul><li>cold-start skeleton (chip pills, dots pill, bottom pill)</li><li>dots + bottom skeleton during zoom with markers kept</li><li>map error pill + retry</li><li>Hyderabad cluster: "50 jobs in this area · 30 companies", then View list showing exactly 50</li><li>Show all → 500 with infinite scroll, footer shimmer, next-page error + retry (re-requested page 4 only)</li><li>Job Details: description skeleton, then API sections</li><li>Last 24 hours chip → View jobs (13)</li><li>All Filters real counts (Pune 45 → Show 45 jobs → map fit to Pune)</li></ul> |
 | — | Linting | **Not available**: no ESLint config in the project; none added to avoid extra dependencies |
 
 ## Known issues
@@ -128,6 +190,17 @@ The core assessment requirements come first. Other features must not break them.
 - The map is a static, locally drawn illustration. Marker positions are mock percentages, not real coordinates.
 - The Expo template added `frontend/AGENTS.md` and `frontend/.claude/settings.json`. `AGENTS.md` recommends Expo Router and TypeScript checks, which don't match this project (React Navigation, JavaScript only). Both files have been kept for now.
 - `npm install` in `frontend/` reports `npm audit` warnings in transitive dependencies. They have not been fixed, because `audit fix --force` could break SDK version pins.
+
+- Prompt #24: the user deleted the 120 Prompt #23 jobs on purpose before the new seed, so the collection was empty as expected. The 500-job seed reuses all of their jobIds.
+- Prompt #24: `postedAt` is set once on first insert, so "Last 24 hours" / aging counts shrink over time (14 jobs were in the last 24 hours at seed time). Re-dating needs a deliberate option; it is not done automatically.
+- Prompt #24: the app still uses its local 120 mock jobs. The 500 seeded jobs appear only once the Jobs API exists.
+
+- Prompt #27: the production Compose setup is single-host with no HTTPS or reverse proxy; one is needed before exposing port 5000 to the internet. The Redis password is visible to anyone who can run `docker inspect` on that host (environment variables). Development Redis has no persistence.
+
+- Prompt #29: grid clustering can draw neighbouring clusters overlapping when their jobs sit near a cell edge (seen at Mumbai/Pune at zoom 5 and inside Pune at zoom 11). Counts and View list stay exact. Fixing it needs a merge step or point-based clustering (decision pending).
+- Prompt #29: "Last 24 hours" uses the stored `postedAt`; it already shows 13 and will drop to 0 as the seed ages. The dates are not changed.
+- Prompt #29: the app defaults to `http://10.0.2.2:5000`. A backend process started before Prompt #29 must be restarted to serve `/api/jobs`.
+- Prompt #29: the guest-storage unit tests from Phase A (Prompt #22) are not in the repository (never committed); `frontend/tests` now holds only the All Jobs tests.
 
 ## Remaining assessment deliverables
 - [ ] Source repository with regular Git commits (5 commits so far; Prompt #7 changes not yet committed)

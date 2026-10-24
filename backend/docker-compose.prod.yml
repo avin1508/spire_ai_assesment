@@ -1,0 +1,106 @@
+# Production: the backend API (Dockerfile.prod) plus Redis. MongoDB stays on Atlas.
+#
+#   docker compose -f docker-compose.prod.yml up --build -d
+#   docker compose -f docker-compose.prod.yml ps
+#   docker compose -f docker-compose.prod.yml down
+#
+# Needs in backend/.env (never committed): the DB_* values and REDIS_PASSWORD
+# (use a long random value of letters and digits, e.g. `openssl rand -hex 32`,
+# because it is placed in the Redis URL).
+#
+# Differences from the development setup (docker-compose.yml):
+#   - production image: production dependencies only, no source mount, no nodemon
+#   - Redis requires a password and is NOT published to the host
+#   - Redis data persists in a named volume (append-only file)
+#   - read-only backend filesystem, restart always, log rotation, memory limits
+
+# Separate project name, so it never replaces the development containers.
+name: spire-ai-prod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  redis:
+    image: redis:8.2.10-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in backend/.env}
+    # sh -c so the password comes from the environment, not from this file.
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    # No `ports:` — only the backend can reach Redis, over the Compose network.
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      # REDISCLI_AUTH keeps the password off the redis-cli command line.
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    logging: *logging
+    restart: always
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: spire-ai-backend:prod
+    # DB_* credentials come from backend/.env at runtime; they are not in the image.
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      # The Compose service name is the hostname inside the Docker network.
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in backend/.env}@redis:6379
+    ports:
+      - "${BACKEND_HOST_PORT:-5000}:5000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    # The health check is defined in Dockerfile.prod.
+    read_only: true
+    tmpfs:
+      - /tmp
+    init: true
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    logging: *logging
+    restart: always
+
+  # Resume-parse worker (BullMQ): same production image, different entry point.
+  worker:
+    image: spire-ai-backend:prod
+    command: ["node", "src/worker.js"]
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in backend/.env}@redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    # The image's HTTP health check is for the API; the worker serves no HTTP.
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    init: true
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    logging: *logging
+    restart: always
+
+volumes:
+  redis-data:

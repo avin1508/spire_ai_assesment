@@ -1,4 +1,5 @@
-// UI constants for the Jobs screens. The job data itself lives in mockJobs.js.
+// UI constants for the Jobs screens. All Jobs data comes from the backend
+// (services/jobsService.js); mockJobs.js is no longer used by the app.
 
 export const filterOptions = [
   { id: 'recommended', label: 'Recommended', icon: 'sparkles', iconColor: '#E3A21A' },

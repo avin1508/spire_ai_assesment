@@ -12,10 +12,13 @@ import FilterSheet from '../components/FilterSheet';
 import { useDispatch, useSelector } from 'react-redux';
 import { selectIsGuest } from '../store/sessionSlice';
 import {
-  loadRecommendations,
+  retryRecommendations,
   selectProfile,
   selectRecommendations,
 } from '../store/profileSlice';
+import { resyncRecommendations } from '../store/recommendationSync';
+import useRecommendationPolling from '../hooks/useRecommendationPolling';
+import { recommendationView } from '../utils/recommendations';
 import useResumeUpload from '../hooks/useResumeUpload';
 import useRequireAuth from '../hooks/useRequireAuth';
 import {
@@ -27,8 +30,9 @@ import {
 } from '../utils/jobFilters';
 import { colors, spacing } from '../theme';
 
-// Recommended tab: landing (no profile yet) → status (loading / empty /
-// unavailable) → job list. Guest vs signed-in comes from the session.
+// Recommended tab: landing (no profile yet) → status (generating / waiting
+// for quota / failed) → job list ranked by the server. Guest vs signed-in
+// comes from the session.
 export default function RecommendedScreen() {
   const navigation = useNavigation();
   const dispatch = useDispatch();
@@ -36,6 +40,7 @@ export default function RecommendedScreen() {
   const profile = useSelector(selectProfile);
   const recommendations = useSelector(selectRecommendations);
   const startResumeUpload = useResumeUpload();
+  useRecommendationPolling();
 
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState('recommended');
@@ -152,7 +157,7 @@ export default function RecommendedScreen() {
             <JobCard
               job={item}
               locked={isGuest}
-              onPress={() => navigation.navigate('JobDetails', { job: item })}
+              onPress={() => navigation.navigate('JobDetails', { job: item, jobId: item.jobId })}
               onShare={() => Share.share({ message: `${item.title} at ${item.company}` })}
               onSave={isGuest ? promptSignUp : undefined}
               onLearnSkill={
@@ -162,10 +167,13 @@ export default function RecommendedScreen() {
           )}
         />
       ) : (
-        <RecommendationStatus
-          status={recommendations.status === 'idle' ? 'loading' : recommendations.status}
-          message={recommendations.message}
-          onRetry={() => dispatch(loadRecommendations(profile))}
+        <StatusView
+          view={recommendationView(recommendations)}
+          onRetry={() =>
+            recommendations.status === 'failed' && recommendations.recommendationId
+              ? dispatch(retryRecommendations(recommendations.recommendationId))
+              : dispatch(resyncRecommendations())
+          }
         />
       )}
 
@@ -193,6 +201,16 @@ export default function RecommendedScreen() {
         onClose={() => setOpenSheet(null)}
       />
     </View>
+  );
+}
+
+function StatusView({ view, onRetry }) {
+  return (
+    <RecommendationStatus
+      status={view.status}
+      message={view.message}
+      onRetry={view.status === 'error' && view.canRetry === false ? undefined : onRetry}
+    />
   );
 }
 

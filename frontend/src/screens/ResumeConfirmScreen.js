@@ -3,19 +3,19 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Button from '../components/Button';
-import { useDispatch } from 'react-redux';
-import { resumeSelected } from '../store/profileSlice';
 import { pickResume } from '../utils/pickResume';
-import { persistGuestResume } from '../storage/resumeFiles';
+import { stageResumeForUpload } from '../storage/resumeFiles';
 import { formatFileSize } from '../utils/format';
+import { validatePickedResume } from '../utils/resumeProcessing';
 import { colors, radius, spacing } from '../theme';
 
 // Confirms the picked resume before processing. Used for first uploads and
-// for later resume updates (signed in or not).
+// for later resume updates. The current resume/profile stay unchanged until
+// the user confirms the new profile.
 export default function ResumeConfirmScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const dispatch = useDispatch();
   const [file, setFile] = useState(route.params.file);
+  const problem = validatePickedResume(file);
 
   const size = formatFileSize(file.size);
   const extension = file.name.includes('.') ? file.name.split('.').pop().toUpperCase() : null;
@@ -32,24 +32,27 @@ export default function ResumeConfirmScreen({ navigation, route }) {
 
   const [saving, setSaving] = useState(false);
 
-  // Copy the file into permanent storage first. Only a successful copy
-  // replaces the saved resume; on failure the existing resume is untouched.
+  // Stage a readable copy for the upload, then start processing. Nothing
+  // saved (current resume or profile) changes here.
   const confirm = async () => {
+    if (problem) {
+      Alert.alert("This file can't be used", problem);
+      return;
+    }
     setSaving(true);
-    let saved;
+    let staged;
     try {
-      saved = await persistGuestResume(file);
+      staged = await stageResumeForUpload(file);
     } catch (error) {
-      console.warn('[ResumeConfirm] could not copy resume:', error?.message ?? error);
+      console.warn('[ResumeConfirm] could not read resume:', error?.message ?? error);
       setSaving(false);
       Alert.alert(
-        "Couldn't save this file",
+        "Couldn't read this file",
         'Please try again, or choose a different file. Your current resume has not been changed.'
       );
       return;
     }
-    dispatch(resumeSelected(saved));
-    navigation.replace('ProfileProcessing', { returnTo: route.params.returnTo });
+    navigation.replace('ProfileProcessing', { file: staged, returnTo: route.params.returnTo });
   };
 
   return (
@@ -78,13 +81,18 @@ export default function ResumeConfirmScreen({ navigation, route }) {
               {file.name}
             </Text>
             {details ? <Text style={styles.fileDetails}>{details}</Text> : null}
+            {problem ? <Text style={styles.fileProblem}>{problem}</Text> : null}
           </View>
-          <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+          <Ionicons
+            name={problem ? 'alert-circle' : 'checkmark-circle'}
+            size={24}
+            color={problem ? colors.danger : colors.success}
+          />
         </View>
       </View>
 
       <View style={styles.footer}>
-        <Button label="Yes, continue" onPress={confirm} loading={saving} />
+        <Button label="Yes, continue" onPress={confirm} loading={saving} disabled={Boolean(problem)} />
         <Button
           label="Choose a different file"
           variant="outline"
@@ -98,6 +106,11 @@ export default function ResumeConfirmScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  fileProblem: {
+    marginTop: 4,
+    fontSize: 13,
+    color: colors.danger,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.surface,

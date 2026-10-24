@@ -1,27 +1,21 @@
-import { mockRecommendations } from '../data/mockRecommendations';
+import { guestRequest } from './guestApi';
 
-// Short wait so the "Agent Sigma is on the hunt" loading state is visible.
-const MOCK_DELAY_MS = 1500;
+// Client for the backend recommendations API
+// (backend/src/routes/recommendations.routes.js). Scoped to this guest.
 
 /**
- * Resolves with recommended jobs for a confirmed profile. Each job:
- * {
- *   id: string,
- *   title: string,
- *   company: string,
- *   location: string,
- *   postedAt: string (ISO date),
- *   verified?: boolean,
- *   fitLabel?: string,          // e.g. "Good Fit"
- *   matchedSkills?: string[],
- *   gapSkills?: string[],       // skills the job needs that the profile lacks
- * }
- *
- * MOCK: returns hardcoded sample jobs (src/data/mockRecommendations.js) for
- * every profile. Replace with the backend matching API in a later phase;
- * on failure it should throw (ServiceUnavailableError when not reachable).
+ * Makes sure recommendations exist for this matching profile (see
+ * utils/recommendations.js buildMatchingProfile). Same profile again → the
+ * existing recommendation; a changed profile → a new one.
+ * → { recommendationId, profileVersion, status, nextAttemptAt, error, pollAfterMs, items }
  */
-export async function fetchRecommendations(profile) {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS));
-  return mockRecommendations;
-}
+export const ensureRecommendations = (matchingProfile) =>
+  guestRequest('/api/recommendations', { method: 'POST', json: { matchingProfile } });
+
+/** Current recommendation status (+ items when completed), or { status: 'none' }. */
+export const fetchCurrentRecommendations = ({ signal } = {}) =>
+  guestRequest('/api/recommendations/current', { signal });
+
+/** Re-schedules a failed, retryable recommendation. */
+export const retryRecommendations = (recommendationId) =>
+  guestRequest(`/api/recommendations/${encodeURIComponent(recommendationId)}/retry`, { method: 'POST' });

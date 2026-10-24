@@ -1,8 +1,7 @@
 import { createListenerMiddleware } from '@reduxjs/toolkit';
 import { loadGuestData, saveGuestData } from '../storage/guestStore';
-import { resumeFileExists } from '../storage/resumeFiles';
 import { resolveRestore } from '../storage/restore';
-import { guestDataRestored, loadRecommendations } from './profileSlice';
+import { guestDataRestored } from './profileSlice';
 import { selectIsGuest } from './sessionSlice';
 
 // Saves the guest's profile + resume metadata whenever they change, and
@@ -36,7 +35,5 @@ export const restoreGuestData = () => async (dispatch) => {
     console.warn('[guestPersistence] storage unreadable; saving disabled this session');
   }
 
-  const restored = resolveRestore(result, resumeFileExists);
-  dispatch(guestDataRestored(restored));
-  if (restored.profile) dispatch(loadRecommendations(restored.profile));
+  dispatch(guestDataRestored(resolveRestore(result)));
 };

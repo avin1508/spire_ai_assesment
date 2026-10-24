@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.spireai.iexchange",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -31,7 +32,9 @@
           "locationWhenInUsePermission": "Allow Spire.AI to use your location to show jobs near you."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-sharing",
+      "expo-notifications"
     ]
   }
 }

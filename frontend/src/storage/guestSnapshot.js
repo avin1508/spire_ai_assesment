@@ -61,16 +61,23 @@ export function sanitizeProfile(profile) {
   };
 }
 
-// Resume metadata only — the file itself lives on disk at `uri`.
+// Resume metadata only. The file is stored on the server (resumeId); older
+// snapshots point at a device copy (uri) instead and are kept as they are.
 export function sanitizeResume(resume) {
-  if (!resume || typeof resume !== 'object' || !str(resume.name) || !str(resume.uri)) return null;
-  return {
+  if (!resume || typeof resume !== 'object' || !str(resume.name)) return null;
+  if (!str(resume.resumeId) && !str(resume.uri)) return null;
+  const clean = {
     name: resume.name,
-    uri: resume.uri,
     size: typeof resume.size === 'number' ? resume.size : null,
     mimeType: str(resume.mimeType) || null,
-    persisted: resume.persisted === true,
   };
+  if (str(resume.resumeId)) {
+    clean.resumeId = resume.resumeId;
+    clean.kind = resume.kind === 'pdf' || resume.kind === 'docx' ? resume.kind : null;
+  } else {
+    clean.uri = resume.uri;
+  }
+  return clean;
 }
 
 export function serializeGuestData({ profile, resume }, now = Date.now()) {
