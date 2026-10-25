@@ -1,318 +1,187 @@
 # Spire.AI iExchange Clone
 
-Practical assessment project: a job-matching mobile app. Users can upload a resume (as a guest or with an account), get AI-based job recommendations, browse and search jobs, and track saved and applied jobs.
+A job-matching mobile app built with AI assistance for the Spire.AI AI-Native Full-Stack Mobile Developer practical assessment. Users browse and search jobs from our own backend on a map or in a list, open job details, sign up / log in with email and password, upload a resume that is parsed into a profile by AI, get AI-ranked job recommendations, and receive a push notification when the recommendations are ready.
 
-> **Status:** Phase 2 (UI development) in progress. The Recommended jobs UI and the resume → profile → recommendations flow are built, waiting for review. Resume parsing and job matching are not connected yet (no backend integration), so those steps show honest "not available yet" states. See [PROGRESS.md](PROGRESS.md).
+**Demo setup:** everything runs locally — Expo app on an Android emulator, Express API + Redis + BullMQ worker in Docker Compose, MongoDB Atlas, Gemini, Firebase Cloud Messaging.
 
-## Tech stack
+## Features
 
-| Layer | Technology | Status |
-| --- | --- | --- |
-| Mobile frontend | React Native + Expo (SDK 58), JavaScript only | Opportunities, Recommended and resume-flow UI |
-| Navigation | React Navigation 7: native stack for full-screen flows; bottom tabs for the main app; material top tabs (`react-native-tab-view` + `react-native-pager-view`) for the swipeable Jobs tabs | Done |
-| State management | Redux Toolkit + React Redux (`src/store/`) | Done |
-| File picking | `expo-document-picker` (PDF / Word resumes) | Done |
-| Icons | `@expo/vector-icons` (Ionicons) + `expo-font` | Done |
-| Backend API | Node.js + Express 5, JavaScript ES modules | Initialized |
-| Database | MongoDB Atlas + Mongoose 9 | `Job` model (`src/models/job.model.js`); 500 demo jobs seeded |
-| AI | Gemini API | Not started |
-| Background jobs | BullMQ + Redis | Redis runs in Docker Compose and the backend connects to it; BullMQ not started |
-| Push notifications | Firebase Cloud Messaging (FCM) | Not started |
+| Feature | Status |
+| --- | --- |
+| **Login** — email/password register, login, logout; sessions survive app restarts | Done, verified |
+| **Home screen with items from our backend + search** — 500 seeded jobs on an interactive map (clusters, company markers) and an infinite-scroll list; search, filters (location, company, experience, title, aging, verified, last 24 h), sort | Done, verified |
+| **Detail screen** — job summary, skill match (Exact Match / Gaps), formatted description, apply link | Done, verified |
+| **Resume upload & AI parsing** — PDF/DOCX ≤ 5 MB, parsed in the background (BullMQ worker + Gemini) into an editable profile | Done, verified |
+| **AI job recommendations** — candidates picked from the database, ranked by Gemini, with fit label, matched skills and gaps | Done, verified |
+| **Guest mode + account linking** — guests can do everything above; on register/login their profile, resume and recommendations are linked to the account (an existing account profile is never overwritten) | Done, verified |
+| **Profile** — profile card, resume download/replace, experience and education lists with add/edit/delete; synced to the server | Done, verified |
+| **Push notifications** (nice to have) — "Your job recommendations are ready!" via FCM, permission asked with an explanation first, tap opens Recommended | Done, verified on a development build (Android) |
 
-The project uses JavaScript only, with no TypeScript.
+### Not included / limitations
+- **Saved and Applied tabs, Skills and Learning tabs** are placeholders (out of scope for the assessment).
+- **Edit profile pencil** on the Profile card is display-only (profile is edited by re-uploading a resume or via the Experience/Education screens).
+- **Push notifications:** Android only, and only in a development build — Expo Go cannot receive them (Expo SDK 53+). iOS push isn't set up.
+- **Production (Render):** the API is deployed, but no BullMQ worker runs there, so resume parsing and recommendations only complete locally. The demo uses the local setup.
+- **Map tiles** come from the public OpenStreetMap server (fine for development, not for production traffic).
+- The app's display name is still `frontend` (from `app.json`).
+
+## Technology stack
+
+| Layer | Technology |
+| --- | --- |
+| Mobile app | React Native 0.88 + Expo SDK 58, **JavaScript only** |
+| Navigation / state | React Navigation 7 (stack, bottom tabs, top tabs), Redux Toolkit |
+| Map | Leaflet in a WebView (`react-native-webview`), server-side clustering |
+| Backend | Node.js 22 + Express 5 (ES modules) |
+| Database | MongoDB Atlas + Mongoose 9 (resume files in GridFS) |
+| Background jobs | BullMQ + Redis 8 (Docker) — resume parsing and recommendation queues, one worker process |
+| AI | Google Gemini (`gemini-3.5-flash-lite`, `@google/genai`) for resume parsing and job ranking |
+| Auth | bcrypt password hashes, revocable server-side sessions (SHA-256 token hashes), `expo-secure-store` on the device |
+| Push | Firebase Cloud Messaging HTTP v1 (`google-auth-library`), `expo-notifications`, Android development build (`expo-dev-client`) |
+| Tests | Node's built-in test runner; `mongodb-memory-server` for API tests |
+
+Why: Expo + JS for speed of iteration with AI tooling; Express/Mongo/Redis are simple and well known; BullMQ keeps slow AI calls out of HTTP requests (retries, recovery, quota handling); Gemini Flash-Lite is fast and cheap for structured JSON output.
 
 ## Project structure
 
 ```
 spire_ai/
-├── frontend/          # Expo app (JavaScript)
-│   ├── App.js                 # providers (safe area, Redux store) + NavigationContainer
-│   ├── index.js
-│   ├── app.json
-│   ├── assets/                # icons + recommended-jobs-hero.png illustration
-│   └── src/
-│       ├── theme.js           # colors, spacing, radius, typography
-│       ├── navigation/        # AppNavigator (stack), RootNavigator (main tabs), JobsNavigator (nested tabs)
-│       ├── screens/           # Opportunities, Recommended, ResumeConfirm, ProfileProcessing,
-│       │                      # ProfileConfirm, Placeholder
-│       ├── components/        # AppHeader, JobsTabBar, JobCard, RecommendedLanding, RecommendationStatus,
-│       │                      # SearchField, FilterChip, Button, map components, ...
-│       ├── store/             # Redux Toolkit: session slice (guest / signed-in), profile slice (resume, profile, recommendations)
-│       ├── services/          # resumeService (not connected yet), recommendationService (returns MOCK jobs for now)
-│       ├── hooks/             # useResumeUpload
-│       ├── utils/             # pickResume, format helpers
-│       ├── config/            # api.js (backend URL), map.js, auth.js
-│       └── data/              # mockMap.js (chip constants), mockRecommendations.js (sample recommended jobs)
-├── backend/           # Express API
-│   ├── src/
-│   │   ├── server.js          # loads .env, connects to MongoDB (and Redis if configured), then listens
-│   │   ├── app.js             # Express app: /health, /api/jobs, JSON errors
-│   │   ├── routes/            # jobs.routes.js (All Jobs API)
-│   │   ├── services/          # jobQuery.js (validation + shared filter), jobs.service.js (queries, map clustering)
-│   │   ├── utils/             # httpErrors.js, geo.js
-│   │   ├── config/            # env.js (reads env vars), db.js (MongoDB), redis.js (Redis client)
-│   │   ├── models/            # job.model.js (Job schema, enums, indexes)
-│   │   ├── data/              # 500-job demo dataset: cities.js, companies.js, roles.js, jobs.dataset.js
-│   │   ├── seed/              # jobTransform.js (validation, DB document ↔ frontend job shape)
-│   │   └── scripts/           # seedJobs.js
-│   ├── tests/                 # node --test
-│   ├── Dockerfile.dev         # development image (all deps, nodemon auto-reload)
-│   ├── Dockerfile.prod        # production image (multi-stage, production deps only, non-root, health check)
-│   ├── docker-compose.yml     # development: backend + Redis (project name: spire-ai)
-│   ├── docker-compose.prod.yml  # production: backend + password-protected, persistent Redis (project: spire-ai-prod)
-│   ├── .dockerignore          # keeps .env, node_modules and tests out of the image
-│   ├── .env.example
-│   └── package.json
-├── AI_NOTES.md        # Log of AI-assisted prompts
-├── PROGRESS.md        # Scope, phase and task tracking
+├── frontend/                Expo app
+│   ├── App.js               providers, navigation, session restore, notification taps
+│   ├── app.json             Expo config (Android package com.spireai.iexchange)
+│   ├── google-services.json Firebase client config for Android
+│   └── src/  screens/ components/ navigation/ store/ services/ storage/ notifications/ utils/ hooks/ config/
+├── backend/
+│   ├── src/  server.js (API) · worker.js (BullMQ worker) · app.js · routes/ services/ models/ queue/ workers/ middleware/ data/ seed/ scripts/
+│   ├── tests/               node --test (API, worker, auth, linking, push, …)
+│   ├── docker-compose.yml   development: backend + worker + Redis
+│   ├── docker-compose.prod.yml
+│   └── .env.example
+├── AI_NOTES.md              AI tools, key prompts, mistakes and fixes, full prompt log
+├── PROGRESS.md              task tracking
 └── README.md
 ```
 
-## Requirements
+## Prerequisites
 
-- Node.js 20+ (developed on Node 22.21.1) and npm 10+
-- The Expo Go app on an Android or iOS device, or an Android emulator / iOS simulator
+- Node.js 22 (developed on 22.21.1) and npm 10
+- Docker Desktop (runs the API, Redis and the worker)
+- A MongoDB Atlas database and a Gemini API key (Google AI Studio)
+- Android Studio with an emulator image **with Google Play** (Android 13+), or an Android phone
+- For push notifications: a Firebase project and its service-account key file (see below)
 
-## Installation and running
+## Setup
 
-The frontend and backend are installed and run separately.
+### 1. Backend environment
+```bash
+cd backend
+cp .env.example .env      # fill in the values — see .env.example for every variable
+```
+Required: `DB_USERNAME`, `DB_PASSWORD`, `DB_CLUSTER_URL`, `DB_NAME`, `GEMINI_API_KEY`, `GEMINI_MODEL`.
+Optional: `PORT`, `REDIS_URL` (Compose sets it), `REDIS_PASSWORD` (production Compose), `GEMINI_RPM` / `GEMINI_TPM` / `GEMINI_DAILY_BUDGET`, `RECOMMENDATION_CONCURRENCY`, `RECOMMENDATION_FRESH_HOURS`, `SESSION_TTL_DAYS`, `BCRYPT_ROUNDS`.
 
-### Backend (`backend/`)
+**Push notifications:** put the Firebase service-account key (`<project>-firebase-adminsdk-….json`, from Firebase Console → Project settings → Service accounts) in `backend/`. It is found automatically by its name pattern, git-ignored, and mounted read-only into the containers. Without it the app works; only push is disabled (the logs say so).
 
+### 2. Seed the jobs (once)
 ```bash
 cd backend
 npm install
-cp .env.example .env   # then fill in the DB_* values (required: the server won't start without a database)
-npm run dev            # start with nodemon (auto-reload)
-# or
-npm start              # start with node
+npm run seed:jobs            # upserts 500 fictional demo jobs by jobId; safe to re-run, never deletes
 ```
 
-### Backend with Docker — development (backend + Redis)
-
-You need Docker Desktop running. Redis doesn't need to be installed on Windows; it runs from the official `redis:8.2.10-alpine` image. The development image runs nodemon, and `./src` is mounted, so code changes restart the server without a rebuild.
-
-```bash
-cd backend
-cp .env.example .env              # fill in the DB_* values (MongoDB stays on Atlas)
-docker compose up --build -d      # builds the API image, starts Redis, then the API once Redis is healthy
-docker compose ps                 # both services should show (healthy)
-curl http://localhost:5000/health # {"status":"ok","database":"connected","redis":"connected"}
-docker compose logs -f backend    # follow the API logs
-docker compose down               # stop and remove the containers
-```
-
-- In Compose, the backend reaches Redis at `redis://redis:6379`, using the service name, not `localhost`.
-- Redis is also published on `127.0.0.1:6379` only. To use it from `npm run dev` on the host, run `docker compose up -d redis` and set `REDIS_URL=redis://localhost:6379` in `.env`.
-- **Ports:** if port 5000 is already in use (for example by `npm run dev`), choose another host port.
-  - Git Bash: `BACKEND_HOST_PORT=5080 docker compose up -d`
-  - PowerShell: `$env:BACKEND_HOST_PORT=5080; docker compose up -d`
-  - `REDIS_HOST_PORT` works the same way for Redis.
-- **Secrets:** `.env` is never copied into the image. Compose passes it to the container at runtime with `env_file`.
-
-### Backend with Docker — production
-
-`docker-compose.prod.yml` builds `Dockerfile.prod`: a multi-stage build with production dependencies only, running as the non-root `node` user, with a built-in health check. It uses a separate project name (`spire-ai-prod`), so it never replaces the development containers. It also needs `REDIS_PASSWORD` in `backend/.env`, made of letters and digits only (for example `openssl rand -hex 32`); Compose refuses to start without it.
-
-```bash
-cd backend
-docker compose -f docker-compose.prod.yml up --build -d
-docker compose -f docker-compose.prod.yml ps        # both (healthy)
-curl http://localhost:5000/health
-docker compose -f docker-compose.prod.yml logs -f backend
-docker compose -f docker-compose.prod.yml down      # keeps Redis data; add -v to delete it
-```
-
-| | Development (`docker-compose.yml`) | Production (`docker-compose.prod.yml`) |
-| --- | --- | --- |
-| Image | `Dockerfile.dev`: all deps, nodemon | `Dockerfile.prod`: multi-stage, production deps only |
-| Source code | `./src` mounted, auto-reload | Baked into the image; read-only filesystem |
-| Redis access | Published on `127.0.0.1:6379`, no password | Not published; password required (`REDIS_PASSWORD`) |
-| Redis data | Not persisted | Named volume `redis-data`, append-only file |
-| Restart policy | `unless-stopped` | `always` |
-| Limits and logs | None | Memory limits (backend 512 MB, Redis 256 MB); log rotation 3 × 10 MB |
-
-This is a single-host production setup. There is no HTTPS or reverse proxy yet: put one (for example nginx or a cloud load balancer) in front of port 5000 before exposing it to the internet.
-
-### Frontend (`frontend/`)
-
+### 3. Frontend environment
 ```bash
 cd frontend
 npm install
-npm start              # Expo dev server; scan the QR code with Expo Go
-npm run android        # open on an Android device or emulator
-npm run ios            # open on iOS (needs macOS)
-npm run web            # open in the browser
+cp .env.example .env
 ```
+`EXPO_PUBLIC_API_URL` = backend address seen from the device: `http://10.0.2.2:5000` on the Android emulator (default when unset), `http://<your-PC-LAN-IP>:5000` on a phone on the same Wi-Fi. Optional: `EXPO_PUBLIC_MAP_TILE_URL`, `EXPO_PUBLIC_MAP_ATTRIBUTION`.
 
-## Environment variables
+## Running
 
-Backend variables live in `backend/.env`. Copy them from [backend/.env.example](backend/.env.example). `.env` files are git-ignored.
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `PORT` | `5000` | Port the Express server listens on |
-| `DB_USERNAME` | — | MongoDB Atlas database user |
-| `DB_PASSWORD` | — | Its password (URL-encoded automatically; never logged) |
-| `DB_CLUSTER_URL` | — | Atlas cluster host, e.g. `cluster0.xxxxx.mongodb.net` |
-| `DB_NAME` | — | Database name (`spire_db`) |
-| `REDIS_URL` | empty | Optional. Empty means the server runs without Redis. When it's set, the server won't start unless Redis answers. Compose sets it to `redis://redis:6379` (with the password in production) |
-| `REDIS_PASSWORD` | — | Production Compose only: the Redis password (letters and digits only) |
-
-More variables (Gemini key, Firebase credentials) will be added as those features are built.
-
-**Backend address for the frontend:** `EXPO_PUBLIC_API_URL` in `frontend/.env`. Without it, the app uses port 5000 on the computer running the Expo dev server. That's the same LAN address the phone loaded the app from, so a physical phone on the same Wi-Fi works with no setup. `localhost` becomes `10.0.2.2` on the Android emulator. Set the variable for tunnel mode, or when the backend runs on another machine. The phone must be able to reach port 5000 (same network, and allowed by the firewall).
-
-### Seeding the jobs
-
-`src/data/jobs.dataset.js` builds 500 demonstration jobs, all fictional companies and marked `isDemo: true`. They cover 7 categories (Frontend, Backend, Full Stack, Mobile, Data, Cloud & DevOps, QA & Testing) across 17 Indian cities, with coordinates in real business districts. The dataset is deterministic, so every run produces the same jobIds and content. Load it into `spire_db.jobs` with:
-
+### Backend, Redis and worker (Docker)
 ```bash
 cd backend
-npm run seed:jobs -- --dry-run   # show how existing documents map onto the dataset; writes nothing
-npm run seed:jobs                # upsert by jobId
-npm test                         # dataset, schema, transform and seed tests
+docker compose up -d --build     # backend (port 5000) + redis + worker
+docker compose ps                # backend and redis (healthy), worker (Up)
+docker compose logs -f worker    # worker logs: jobs started / completed
 ```
+Health checks: `http://localhost:5000/health` → `database: connected, redis: connected`; `http://localhost:5000/health/queues` → `workers: 1` on both queues.
 
-The seed runs only when you run `npm run seed:jobs` yourself. It doesn't run on server start (`npm start` / `npm run dev`), `npm install` or `npm test`. Run it again only after changing `src/data/` or when the database is empty.
+### The app
+```bash
+cd frontend
+npx expo start --clear           # keep this window open
+```
+- **Development build (needed for push notifications):** build and install once, then press `a` in the Expo window to open it.
+  ```bash
+  npx expo run:android --no-bundler
+  ```
+  On Windows, if the native build fails with a path-length error (`ninja: error: mkdir … No such file or directory`), build from a short drive: `subst S: D:\spire_ai`, run the command from `S:\frontend`, then `subst S: /D` (details in AI_NOTES, Prompt #48).
+- **Expo Go:** everything except push notifications works; scan the QR code or press `a`.
+- **Physical phone:** install the development build (`frontend/android/app/build/outputs/apk/debug/app-debug.apk`, `adb install …`), set `EXPO_PUBLIC_API_URL` to your PC's LAN IP, and keep Metro running. No standalone release APK is provided; the demo runs on the emulator.
 
-The seed is safe to re-run. It validates every record first and writes nothing if any record is invalid or the count isn't 500. It upserts by `jobId` and never deletes or drops anything; documents that aren't in the dataset are left alone and listed. `postedAt` is set only on first insert, and a second run reports `unchanged: 500`.
+## Demo script
 
-The All Jobs tab reads these jobs through the API below. `toJobCard()` and `toFrontendJob()` in `src/seed/jobTransform.js` convert documents into the fields the app uses (`id`, `company`, `location`, `salary` text, `description` with sections).
+1. Fresh start (optional): `adb shell pm clear com.spireai.iexchange`, then press `a` in the Expo window.
+2. **All Jobs:** map with clusters → zoom → company markers; list view; search (e.g. "react"); filters.
+3. **Job details:** tap a job.
+4. **Recommended → Upload Resume** → pick a PDF → confirm → "Building your profile" → review the profile → **Done**.
+5. **Notifications:** our sheet "Get notified when your matches are ready" → **Notify me** → Android **Allow** → press Home → the notification arrives in ~10–20 s → tap it → Recommended jobs open.
+6. **Sign up** (header) → create an account → the guest profile and recommendations are now in the account.
+7. **Profile → Settings → Log out** → empty guest; **log in** again → the account's data is back.
 
-Frontend variables live in `frontend/.env`. Copy them from [frontend/.env.example](frontend/.env.example), then restart Expo. They're bundled into the app, so only public identifiers go here.
+If a notification is late on the emulator, toggle its network (`adb shell svc wifi disable; adb shell svc wifi enable`) — the emulator's connection to Google sometimes stalls. A profile identical to one already processed reuses the existing recommendations instantly and doesn't notify again.
 
-| Variable | Description |
-| --- | --- |
-| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | Google OAuth client ID for Android (package `com.spireai.iexchange` + your signing SHA-1) |
-| `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | Google OAuth client ID for iOS (bundle id `com.spireai.iexchange`) |
-| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | Web client ID (also the audience the backend checks) |
-| `EXPO_PUBLIC_MAP_TILE_URL` / `EXPO_PUBLIC_MAP_ATTRIBUTION` | Optional map tile provider. The public OpenStreetMap default is for development only. |
-
-Google sign-in doesn't work in Expo Go. It needs a development build or APK (`npx expo run:android`, or an EAS build) with the client IDs set. Even then, sign-in only finishes once the backend `POST /api/auth/google` exists to verify the token.
+## Tests
+```bash
+cd backend  && npm test     # 165 tests: jobs API, resume pipeline, recommendations, auth, guest linking, push
+cd frontend && npm test     # 50 tests: list/map logic, profile merge, auth forms, session restore, sync, push decisions
+cd frontend && npx expo-doctor
+```
+Backend API tests use an in-memory MongoDB (`mongodb-memory-server`, downloads a binary on first run); Atlas, Gemini and Firebase are never called (fakes are used).
 
 ## API
 
-| Method | Path | Response |
+| Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/health` | `200 { "status": "ok", "database": "connected", "redis": "connected" }` (`redis` is `"not_configured"` without `REDIS_URL`), or `503 { "status": "degraded", … }` when MongoDB or a configured Redis isn't connected |
-| GET | `/api/jobs` | List page: `{ items, page, limit, total, hasMore }`. Takes `page` (1–500), `limit` (1–50, default 20), `sort=recommended|newest|distance` (distance needs `lat`/`lng`) and `lat`/`lng` (adds `distanceKm`) |
-| GET | `/api/jobs/map` | Map markers for `bbox=west,south,east,north` and `zoom` (0–20): `{ zoom, total, clusters: [{ id, latitude, longitude, count, officeCount, companyCount, bounds }], offices: [{ id, latitude, longitude, count, companyName, area, city, bounds, jobId? }] }` |
-| GET | `/api/jobs/summary` | `{ total, bounds }` for the filters (bounds is `null` when nothing matches) |
-| GET | `/api/jobs/filter-options` | Values and counts per All Filters section, for the jobs matching the given filters |
-| POST | `/api/resumes` | Upload a resume (multipart field `file`, PDF/DOCX ≤ 5 MB, header `X-Guest-Session`, optional `Idempotency-Key`) → `202 { jobId, status: "queued", pollAfterMs, file }`. 401 without a guest session, 413 too large, 415 not PDF/DOCX (checked by content), 503 queue unavailable |
-| GET | `/api/resumes/jobs/:jobId` | Processing status: `{ status: queued|processing|completed|failed, stage, profile (when completed), error { code, message, retryable }, pollAfterMs }`. Another guest's job → 404 |
-| POST | `/api/resumes/jobs/:jobId/retry` | Re-queue a failed, retryable job (409 if not retryable) |
-| POST | `/api/resumes/:resumeId/confirm` | Make it the guest's resume after the profile is saved; the previous resume is deleted |
-| GET | `/api/resumes/:resumeId/download` | The guest's confirmed resume file (owner only, `Cache-Control: private, no-store`) |
-| POST | `/api/recommendations` | `{ matchingProfile }` (skills, role, job titles, experience, locations, degree/field only; anything else is dropped) → `202` new run or `200` existing `{ recommendationId, profileVersion, status, pollAfterMs, … }` |
-| GET | `/api/recommendations/current` | Current status: `queued / processing / deferred / completed / failed` (or `{ status: "none" }`); `items` (real jobs + `fitLabel`, `matchedSkills`, `gapSkills`, `reason`) only when completed |
-| POST | `/api/recommendations/:id/retry` | Re-schedule a failed, retryable run |
-| POST | `/api/auth/register` | `{ name, email, password }` → `201 { user, token, expiresAt }`; 409 `email_taken` |
-| POST | `/api/auth/login` | `{ email, password }` → `{ user, token, expiresAt }`; 401 `invalid_credentials` (same for unknown email); rate limited (429) |
-| POST | `/api/auth/logout` | Bearer → `204`, the session is revoked |
-| GET | `/api/auth/me` | Bearer → `{ user }` |
-| POST | `/api/auth/link-guest` | Bearer + `X-Guest-Session` → links that guest's profile / resume / recommendations to the account (idempotent; one account per guest session) |
-| PUT / DELETE | `/api/devices` | `{ token, platform: "android" }`: register this device's FCM token for the owner (moves it from any previous owner) / remove it (owner only). The worker sends "Your job recommendations are ready!" once per completed run with results, when `FIREBASE_SERVICE_ACCOUNT_FILE` is configured |
-| GET / PUT | `/api/profile` | The owner's complete profile; PUT `{ profile, baseRevision }`, 409 `profile_conflict` if the server copy is newer |
+| GET | `/health` | API, MongoDB and Redis status |
+| GET | `/health/queues` | Waiting/active/failed jobs and connected workers per queue (+ hints) |
+| GET | `/api/jobs` | Job list (`page`, `limit`, `sort`, `q`, filters) |
+| GET | `/api/jobs/map` | Map clusters and office markers for `bbox` + `zoom` |
+| GET | `/api/jobs/summary`, `/api/jobs/filter-options` | Totals/bounds and filter counts |
+| GET | `/api/jobs/:jobId` | Job details |
+| POST | `/api/auth/register`, `/api/auth/login` | Create account / log in → `{ user, token, expiresAt }` |
+| POST | `/api/auth/logout` · GET `/api/auth/me` | Revoke the session · current user |
+| POST | `/api/auth/link-guest` | Link a guest session's data to the account (idempotent) |
+| GET / PUT | `/api/profile` | The owner's complete profile (revision-checked saves) |
+| POST | `/api/resumes` | Upload a resume (multipart `file`) → queued job |
+| GET | `/api/resumes/jobs/:jobId` | Processing status (+ extracted profile when done) |
+| POST | `/api/resumes/jobs/:jobId/retry`, `/api/resumes/:resumeId/confirm` | Retry a failed job · make it the owner's resume |
+| GET | `/api/resumes/:resumeId/download` | Download the owner's resume |
+| POST | `/api/recommendations` · GET `/api/recommendations/current` | Request / read recommendations |
+| POST | `/api/recommendations/:id/retry` | Retry a failed run |
+| PUT / DELETE | `/api/devices` | Register / remove this device's push token |
 
-Resume and recommendation endpoints accept either `Authorization: Bearer <token>` (signed-in user) or `X-Guest-Session` (guest). An invalid token is rejected with 401, never treated as a guest.
-| GET | `/api/jobs/:jobId` | The full job, including the description; 400 for a malformed id, 404 if it doesn't exist |
+Identity: `Authorization: Bearer <token>` for a signed-in user, otherwise `X-Guest-Session: <uuid>` for a guest. Errors are `{ error, message, details? }`.
 
-**Shared filters** (the same meaning on every endpoint):
-- `q`: up to 100 characters. It matches title, company, area, city, state and skills; the text is matched literally (case-insensitive substring), never as a regex.
-- `country`, `location` (city), `state`, `company`, `title`, `experience`: repeat the parameter for several values.
-- `aging=24h|7d|30d`, `verified=true`, `last24h=true`.
-- `bbox`: a map area.
+## Verification status
 
-**Errors:** `400 { error: "invalid_request", details: [{ param, message }] }` for invalid or unknown parameters, `404`, and `503 { error: "service_unavailable" }` when the database is down or slow (each query has an 8 s limit).
+| Check | Result |
+| --- | --- |
+| Automated tests | Backend 165/165, frontend 50/50 pass; Android bundle builds; `expo-doctor` 20/20 |
+| Local stack | API, MongoDB, Redis and worker healthy; both queues have a connected worker |
+| API end-to-end (synthetic account) | Register, wrong password rejected, login, me, jobs list (500), search, map, details, resume upload → parsed in ~8 s → confirmed, profile saved, 15 recommendations in ~10 s, logout + token revoked — 16/16 |
+| App on the Android emulator (development build) | Guest resume flow, permission prompt, notification received and tapped, register with guest linking, account notification, logout/login, restart — verified 2026-10-25 (see AI_NOTES) |
+| Production (Render) | API healthy; no worker, so parsing/recommendations stay queued — not part of the demo |
 
-**Map markers:** grouped in MongoDB.
-- Jobs inside the `bbox` are matched exactly on latitude/longitude, plus a `$geoWithin` polygon so the 2dsphere index is used.
-- They are grouped into company offices (same company, area and city), then into grid cells of about 64 screen pixels at the requested zoom.
-- **One office in a cell:** an *office* marker, drawn as a white bubble with a briefcase, the job count and the company name. A one-job office carries `jobId`, and tapping it opens the job.
-- **Several offices in a cell:** a *cluster*, drawn as a blue numbered pin showing how many offices it holds. Zooming in splits it into smaller pins and company bubbles.
-- **Exact lists:** every marker has the exact bounds of its jobs. Listing with `bbox` = bounds (plus `company` for an office) returns exactly its jobs.
+## Submission checklist
 
-## Testing
-
-Unit tests use Node's built-in test runner, with no extra packages:
-
-```bash
-cd frontend && npm test   # All Jobs loading/shimmer rules, stale responses, infinite-scroll paging, API params
-cd backend && npm test    # dataset, schema, seed, Redis config, and All Jobs API integration tests
-```
-
-The backend API tests run against an in-memory MongoDB (`mongodb-memory-server`, a dev dependency) loaded with the 500-job dataset; Atlas is never touched. The first run downloads a MongoDB binary.
-
-```bash
-```
-
-Uploading a new resume replaces the skills, role and experience taken from the previous resume (it may be a different person's); entries added by hand are kept. Skill spellings are normalised when matching ("React.js" = "React").
-
-Guest data (profile, skills, experience, education, resume details) is saved on the device in AsyncStorage under a guest-only namespace (`spire:guest:*`). The resume file is copied into the app's private document folder, so both survive restarts.
-
-Static checks:
-
-```bash
-cd frontend
-npx expo-doctor                                   # dependency/config checks
-npx expo export --platform android --output-dir <tmp-dir>   # full Android bundle build
-```
-
-Manual checks:
-
-```bash
-# Backend: start the server, then:
-curl http://localhost:5000/health
-# expected: {"status":"ok","database":"connected","redis":"not_configured"}  (or "connected" with REDIS_URL / Docker)
-
-# Frontend: start Expo, then check the bundle builds:
-cd frontend && npm start
-# open in Expo Go, or visit http://localhost:8081/status (expected: packager-status:running)
-```
-
-## Features
-
-### Completed
-- Project initialization: Expo frontend, Express backend, `/health` endpoint.
-- Main bottom tabs: Jobs, Skills, Learning, Profile (Skills, Learning and Profile are placeholders).
-- Nested Jobs tabs: Recommended, All Jobs (default), Saved, Applied (Saved and Applied are placeholders). You can switch tabs by tapping or by swiping horizontally.
-- Recommended tab and resume flow (UI):
-  - Guest landing with the Agent Sigma illustration, Upload Resume and Sign Up to Explore More.
-  - Resume picker (PDF/Word) → "Is this the correct resume?" confirmation with file name and size (reusable for later updates).
-  - "Building Your Profile" processing screen; when parsing isn't available it says so and offers manual entry.
-  - Editable profile form (name, email, phone, WhatsApp opt-in, role, current/preferred locations, experience, company) with validation.
-  - Recommendation states: loading ("Agent Sigma is on the hunt"), no matches, not available yet (with retry), and the job list.
-  - Search plus filters: a Sort sheet (Recommended, Aging, Fitment; Distance stays disabled until location data exists), an All Filters sheet (Country, Location, Company, Experience, Job Title, Aging, State, with search, multi-select, counts, Clear all and Show N jobs), and Verified / Last 24 hours chips. The tab count follows the filtered list.
-  - Job cards: title, company, verified badge, fit label, location, posting age, matched skills, skill gaps with a Learning entry point, share and save. Guests see locked save/learning actions that prompt sign-up.
-  - Job Details: tap a job card to open it. Shows the job summary, Exact Match / Gaps skill chips (gaps link to Learning), the formatted description and a fixed "Apply on company site" button. Guests see locked email / save / apply actions that prompt sign-up; signed-in users can open the apply link.
-  - Header adapts to the session: Upload Resume (guest without profile), Sign up (guest with profile), share + notifications (signed in).
-  - **Not connected yet:** sign-in, and saving the profile beyond the current app session.
-  - **Simulated:** resume parsing returns the same fictional sample profile after 3 seconds (`src/data/mockResume.js`).
-- Profile tab: profile card (initials avatar, contact details, role, locations, experience), a resume card (replace runs the resume flow again and returns to Profile), and Experience and Education sections. The + / ✎ icons on the Profile screen are display-only. "Show all experiences" opens the full list, which has edit mode, add and edit forms with validation, and delete.
-  - **Mock data:** the recommended jobs are 5 hardcoded sample jobs (`src/data/mockRecommendations.js`), the same for every profile. They are not AI matches.
-- **All Jobs, backed by the API and MongoDB (500 seeded demo jobs):**
-  - **Map:** a Leaflet map with clusters and markers from the backend for the visible area. Tapping a cluster shows "N jobs in this area · M companies" with Zoom in / View list; tapping a marker shows the job preview.
-  - **List:** infinite scroll, 20 jobs per page.
-  - **Search and filters:** search, Verified and Last 24 hours chips, and the All Filters sheet with real counts.
-  - **Sort:** Recommended / Newest / Distance. "Recommended" is newest-first until AI ranking exists.
-  - **Other:** View companies, and Job Details loaded by id.
-  - **Loading:** skeleton shimmer while the map loads (reference style), shimmer cards while the list loads the next page, and error + retry states.
-
-### Missing (planned)
-- Completing Google sign-in: the login sheet and Google flow are built, but the backend token check and session are still needed
-- Production map tile provider
-- Resume upload to the backend, real parsing and profile auto-fill (UI ready and simulated; backend missing)
-- AI-based job recommendations (Gemini) (UI ready, showing mock jobs; backend missing)
-- Saved and Applied tabs
-- Saving and emailing jobs
-- Linking guest data to an account
-- Resume re-upload with refreshed recommendations
-- Agent Sigma: basic AI interaction
-- Background resume processing (BullMQ + Redis)
-- In-app notifications and FCM push notifications
-
-## AI usage
-
-All AI-assisted work is logged in [AI_NOTES.md](AI_NOTES.md).
+- [x] Source repository with regular commits; `.env` files and the Firebase service-account key are git-ignored and were never committed
+- [x] README: how to run, technology choices, completed and missing features (this file)
+- [x] AI notes: tools, key prompts, an AI mistake and its fix, manual verification ([AI_NOTES.md](AI_NOTES.md))
+- [x] Login, home screen with backend data + search, detail screen
+- [x] Nice to have: profile, push notifications
+- [x] Local demo ready on the Android emulator (development build installed)
+- [ ] Optional: standalone release APK (not built; the demo runs on the emulator)
+- [ ] Known issue: production worker on Render not running (local demo unaffected)
