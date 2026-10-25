@@ -2713,3 +2713,30 @@ Real delivery and tapping a real notification were not verified. Blockers:
   - "Not now" → no system dialog; the next profile confirm shows no sheet (cooldown).
   - Permission restored afterwards.
 - **Tests:** frontend 50/50; Android bundle OK.
+
+## Prompt #51: Full reset + end-to-end test (permission, notifications, linking)
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Exact prompt:** "now delete every thing ok and test the appliction from the scratch ok how its asking forthe permissionand all how how tha notification and permisonlinking working or not thest the appliction ened to end ok"
+- **"Delete everything" interpreted as:** a fresh app on the emulator (`pm clear`: app data, session and notification permission). No database data was deleted. New synthetic test account D.
+
+### Bug found and fixed
+- **Symptom:** recommendations finished 3 s before the user tapped Allow (`no_devices`), and the late notification on device registration never came.
+- **Cause:** `PUT /api/devices` runs in the **API** container, but the FCM sender and key mount existed only in the **worker**.
+- **Fix:** `server.js` loads the key-file sender too, and the backend service gets the same read-only key mount (dev + prod compose). The atomic claim still prevents duplicates across both processes.
+- **Verified:** the late notification arrived (`sent(1)`).
+
+### End-to-end results (dev build, emulator)
+1. Fresh start: no permission prompt.
+2. Guest:
+   - Ravi resume → Done → our sheet → Notify me → Android dialog → Allow → device registered to the guest;
+   - notification "We've found 15 jobs…" arrived;
+   - tapping it from the Profile tab opened Recommended (15), Java roles.
+3. Register account D from the guest:
+   - profile, resume and recommendation linked (link completed);
+   - the device moved to D; no second permission request.
+4. D uploads the Asha resume (app in background): "We've found 8 jobs…" (the real count) arrived; tapping it opened Recommended (8) as D; `sent(1)`.
+5. Logout: "Build your profile", Recommended (0); the device moved to a new guest.
+6. Login D again: Asha profile, `Asha_Resume.pdf`, Recommended (8); the device moved back to D.
+- **Tests:** backend 162/162, frontend 50/50. No credential text in the logs; the key file is still ignored.

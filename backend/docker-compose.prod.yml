@@ -60,6 +60,16 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in backend/.env}@redis:6379
     ports:
       - "${BACKEND_HOST_PORT:-5000}:5000"
+    volumes:
+      # Firebase service-account key for push notifications: this one file,
+      # read-only (never copied into the image). Fails instead of creating
+      # an empty folder if the file is missing.
+      - type: bind
+        source: ./mypushapp-9ea07-firebase-adminsdk-fbsvc-75e07c0ba2.json
+        target: /app/mypushapp-9ea07-firebase-adminsdk-fbsvc-75e07c0ba2.json
+        read_only: true
+        bind:
+          create_host_path: false
     depends_on:
       redis:
         condition: service_healthy

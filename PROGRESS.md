@@ -218,3 +218,4 @@ The core assessment requirements come first. Other features must not break them.
   - [ ] Real delivery: needs a Firebase service-account key (`FIREBASE_SERVICE_ACCOUNT_FILE`) and an Android development build.
 - [x] **Real push delivery verified** (Prompt #48): key file auto-detected and mounted read-only; Android development build; guest and logged-in pushes received and tapped on the emulator. Tests: backend 162, frontend 49.
 - [x] **Notification permission soft-ask** (Prompt #50): own explanation sheet after profile confirm, system dialog only on "Notify me", 7-day "Not now" cool-down; verified on the dev build.
+- [x] **Full end-to-end re-test from a fresh app** (Prompt #51): permission soft-ask, guest + account notifications and taps, guest→account linking, logout/login device ownership — all passed. Fixed: the API process now also sends (late notification after permission).
