@@ -1,8 +1,8 @@
 # Progress
 
-**Current phase:** Phase 2: UI development — Recommended jobs UI and resume-to-recommendations flow (waiting for review)
-**Current prompt:** #23
-**Last updated:** 2026-10-24
+**Current phase:** Final submission — all required features built and verified locally (see README "Verification status")
+**Current prompt:** #55
+**Last updated:** 2026-10-25
 
 ## Locked feature scope
 
@@ -203,10 +203,10 @@ The core assessment requirements come first. Other features must not break them.
 - Prompt #29: the guest-storage unit tests from Phase A (Prompt #22) are not in the repository (never committed); `frontend/tests` now holds only the All Jobs tests.
 
 ## Remaining assessment deliverables
-- [ ] Source repository with regular Git commits (5 commits so far; Prompt #7 changes not yet committed)
-- [ ] README with setup, technology choices, completed and missing features (keep updated)
-- [x] AI notes with tools, key prompts and one genuine AI mistake that was corrected (keep updating)
-- [ ] Working demo on a device or emulator (the UI runs on an Android emulator; core features still missing)
+- [x] Source repository with regular Git commits (secrets and .env files never committed)
+- [x] README with setup, technology choices, completed and missing features (rewritten in Prompt #55)
+- [x] AI notes with tools, key prompts and one genuine AI mistake that was corrected (summary added in Prompt #55)
+- [x] Working demo on the Android emulator (development build; local backend in Docker)
 - [ ] Ability to explain the code
 - [ ] Ability to make a small live change during the demo
 - [x] **Email/password accounts + guest linking** (Prompt #45):

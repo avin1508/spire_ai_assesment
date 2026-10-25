@@ -1,6 +1,43 @@
 # AI Notes
 
-A log of every AI-assisted task in this project.
+## Summary (for the assessment)
+
+### AI tools used
+- **Claude Code** (VS Code extension, model Claude Opus 5.5) — used for the whole project: planning, writing frontend and backend code, tests, Docker setup, debugging, emulator verification (driven through `adb`) and documentation. Every task is logged below with its exact prompt.
+- **Google Gemini** (`gemini-3.5-flash-lite`) — used *inside the product*, not for development: it turns resume text into a structured profile and ranks job candidates for recommendations.
+
+### How I worked with the AI
+1. **Ask for a plan or audit first, then implement** — e.g. Prompt #16 (whole-project review and backend plan), Prompt #44 (inspect auth before building it).
+2. **Detailed specs with explicit constraints** — e.g. Prompt #45 (email/password auth + exact guest-linking rules, 31 required tests), Prompt #47 (push notifications: trigger point, duplicate prevention, owner isolation).
+3. **Require real verification** — every feature prompt asked for automated tests *and* a check on the emulator; the AI had to report PASS / FAIL / NOT VERIFIED instead of claiming success.
+4. **Bug reports from real use** — e.g. Prompt #42 ("MERN profile gets Java jobs, React shown as a gap"), Prompt #49 (a red error box screenshot).
+
+### Representative prompts
+| # | Prompt (short) | Result |
+| --- | --- | --- |
+| 24 | Fix the Atlas connection, refactor the Job model, seed 500 jobs | Deterministic 500-job dataset, safe re-runnable seed |
+| 29 | Build and integrate the All Jobs API (list, map, filters, details) with tests | MongoDB clustering for the map, infinite list, filters |
+| 34 | Phase 1: resume upload and profile processing (BullMQ + Gemini) | Upload → queue → worker → profile, retries, idempotency |
+| 41 | Guest job recommendations end to end | Candidate selection + Gemini ranking, quota-safe worker |
+| 45 | Email/password auth + guest data linking | Sessions, profile API, idempotent linking, 28 backend tests |
+| 47–48 | Push notifications for finished recommendations; real delivery | FCM sender, device ownership, Android development build |
+| 50 | "When should we ask for notification permission?" | Explanation sheet first, system dialog only on "Notify me" |
+
+### Example of an AI mistake and how it was corrected (Prompt #42)
+- **Mistake:** when a new resume was uploaded, the AI's profile-merge code (written in Prompt #12) *added* the new resume's skills to the old ones instead of replacing them. It had assumed the same person always re-uploads. It also compared skills as exact strings, so "React.js" on a resume didn't match "React" in a job.
+- **How it was found:** I tested with resumes of different people and reported that my MERN profile got Java recommendations and React showed as a skill gap.
+- **Fix:** the AI inspected the stored data, found both root causes, rewrote the merge (a new resume replaces resume-derived data; manual entries are kept), added skill-name normalisation, versioned the matching rules so stale results were regenerated, added tests, and ran a live test with four different resumes in one session (all checks passed).
+- Other mistakes it made and corrected are listed per prompt below, e.g. loading `expo-notifications` crashed Expo Go and an Expo Go check used the wrong flag (Prompt #47); the push sender was only set up in the worker, so a late notification from the API never went out — found when re-testing from a fresh app (Prompt #51).
+
+### What was verified manually
+- On the Android emulator (development build): map/list/search/details, guest resume flow, the permission explanation sheet, real push notifications received and tapped (guest and account), register with guest linking, logout/login, app restart, keyboard handling on Login/Register/Profile Confirm (Prompts #43, #46, #48, #50, #51).
+- Final local audit (2026-10-25): backend 165/165 and frontend 50/50 tests, Android bundle, `expo-doctor` 20/20, and a 16-step API end-to-end run with a synthetic account (auth, jobs, search, details, resume parsing, profile, recommendations, logout) — all passed.
+
+---
+
+## Full prompt log
+
+Every AI-assisted task, in order.
 
 **AI tool:** Claude (Claude Code in the VS Code extension, model Claude Opus 5.5)
 
@@ -2765,3 +2802,19 @@ Real delivery and tapping a real notification were not verified. Blockers:
 Open `https://spire-ai-assesment.onrender.com/health/queues` after deploying:
 - `workers: 0` with waiting jobs → no worker on that Redis;
 - different `redis` hosts in the API and worker logs → they use different REDIS_URL values.
+
+## Prompt #55: Final assessment submission audit
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Prompt:** "# Final Assessment Submission Audit — Spire.AI iExchange Clone …" (audit against the assessment requirements, verify locally, update README / AI notes / checklist, no commits, no production fixes).
+- **Audit:**
+  - git clean (all work committed); the frontend points to the local backend;
+  - `.env` files, the Firebase service-account key and `frontend/android/` are git-ignored; no secret ever committed (history checked);
+  - `frontend/google-services.json` (client config, public identifiers) is tracked.
+- **Verified (actually run):**
+  - Docker stack: API, MongoDB, Redis healthy; worker connected to both queues;
+  - backend 165/165, frontend 50/50, Android bundle, `expo-doctor` 20/20;
+  - local API end-to-end with a synthetic account, 16/16.
+- **Not re-run in this audit:** the emulator UI and real push. Last verified earlier on 2026-10-25 (Prompts #51, #54).
+- **Docs:** README rewritten (it still described mock data and Google sign-in); AI_NOTES summary added; PROGRESS checklist updated. No functional code changes.
