@@ -1,6 +1,6 @@
 import { Queue } from 'bullmq';
 import { Redis } from 'ioredis';
-import { getRedisUrl } from '../config/env.js';
+import { describeRedisTarget, getRedisUrl } from '../config/env.js';
 import { ServiceUnavailableError } from '../utils/httpErrors.js';
 
 // BullMQ queue for resume parsing, on the existing Redis (REDIS_URL).
@@ -63,6 +63,10 @@ async function addToQueue({ resumeId, fileId, kind, run }) {
       ),
       timeout,
     ]);
+    console.log(`[queue] ${RESUME_QUEUE}: job ${resumeId}-${run} added (redis ${describeRedisTarget(getRedisUrl())})`);
+  } catch (error) {
+    console.error(`[queue] ${RESUME_QUEUE}: adding job ${resumeId}-${run} failed: ${error?.message ?? error}`);
+    throw error;
   } finally {
     clearTimeout(timer);
   }

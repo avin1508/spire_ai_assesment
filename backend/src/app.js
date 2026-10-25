@@ -7,6 +7,9 @@ import recommendationsRouter from './routes/recommendations.routes.js';
 import authRouter from './routes/auth.routes.js';
 import profileRouter from './routes/profile.routes.js';
 import devicesRouter from './routes/devices.routes.js';
+import { queueHealth, queueHints } from './queue/queueDiagnostics.js';
+import { RESUME_QUEUE } from './queue/resumeQueue.js';
+import { RECOMMENDATION_QUEUE } from './queue/recommendationQueue.js';
 
 // MongoDB driver errors that mean "database unavailable or too slow".
 const UNAVAILABLE_ERRORS = new Set([
@@ -48,6 +51,14 @@ export function createApp() {
       database,
       redis,
     });
+  });
+
+  // Queue diagnostics: job counts and connected workers per queue (no job
+  // data). "workers: 0" with waiting jobs = no worker on this Redis.
+  app.get('/health/queues', async (req, res) => {
+    const report = await queueHealth([RESUME_QUEUE, RECOMMENDATION_QUEUE]);
+    res.set('Cache-Control', 'no-store');
+    res.json({ ...report, hints: queueHints(report) });
   });
 
   app.use('/api/jobs', jobsRouter);
