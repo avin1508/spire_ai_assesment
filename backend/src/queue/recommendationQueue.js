@@ -1,5 +1,6 @@
 import { Queue } from 'bullmq';
 import { createRedisClient } from './resumeQueue.js';
+import { describeRedisTarget, getRedisUrl } from '../config/env.js';
 import { ServiceUnavailableError } from '../utils/httpErrors.js';
 
 // BullMQ queue for recommendation generation (same Redis as resume parsing).
@@ -44,6 +45,10 @@ async function addToQueue({ recommendationId, run }) {
       ),
       timeout,
     ]);
+    console.log(`[queue] ${RECOMMENDATION_QUEUE}: job rec-${recommendationId}-${run} added (redis ${describeRedisTarget(getRedisUrl())})`);
+  } catch (error) {
+    console.error(`[queue] ${RECOMMENDATION_QUEUE}: adding job rec-${recommendationId}-${run} failed: ${error?.message ?? error}`);
+    throw error;
   } finally {
     clearTimeout(timer);
   }

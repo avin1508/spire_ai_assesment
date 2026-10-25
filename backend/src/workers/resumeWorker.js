@@ -6,6 +6,7 @@ import { extractResumeText } from '../services/resumeText.js';
 import { normalizeExtractedProfile } from '../services/resumeProfile.js';
 import { ResumeProcessingError, resumeError } from '../services/resumeErrors.js';
 import { estimateTokens } from '../services/geminiQuota.js';
+import { attachWorkerLogging } from '../queue/queueDiagnostics.js';
 
 // Processes one resume-parse job:
 //   stored file → text (extracting_text) → Gemini (analyzing)
@@ -90,6 +91,6 @@ export function startResumeWorker({ extractProfile, quota, concurrency = 2 }) {
     connection: createRedisClient(),
     concurrency,
   });
-  worker.on('error', (error) => console.error(`[resume-worker] ${error.message}`));
+  attachWorkerLogging(worker, 'resume-worker');
   return worker;
 }

@@ -5,7 +5,8 @@ import { createJobRanker, createProfileExtractor } from './services/gemini.js';
 import { createQuotaGuard, createRedisQuotaStore } from './services/geminiQuota.js';
 import { cleanupResumes, requeueStuckResumes } from './services/resumes.service.js';
 import { maintainRecommendations } from './services/recommendations.service.js';
-import { createRedisClient } from './queue/resumeQueue.js';
+import { createRedisClient, RESUME_QUEUE } from './queue/resumeQueue.js';
+import { RECOMMENDATION_QUEUE } from './queue/recommendationQueue.js';
 import { startResumeWorker } from './workers/resumeWorker.js';
 import { startRecommendationWorker } from './workers/recommendationWorker.js';
 import { pushSenderFromKeyFile, setPushSender } from './services/push.service.js';
@@ -82,7 +83,7 @@ async function start() {
     quota,
     concurrency: positiveInt(process.env.RECOMMENDATION_CONCURRENCY, 1),
   });
-  console.log(`Resume + recommendation workers started (${describeRedisTarget(getRedisUrl())})`);
+  console.log(`Resume + recommendation workers started (${describeRedisTarget(getRedisUrl())}); queues: "${RESUME_QUEUE}", "${RECOMMENDATION_QUEUE}"`);
 
   await runCleanup();
   await runRecommendationSweep();

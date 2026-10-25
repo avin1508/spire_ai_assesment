@@ -8,6 +8,7 @@ import { buildRankingPrompt } from '../services/gemini.js';
 import { estimateTokens } from '../services/geminiQuota.js';
 import { ResumeProcessingError, resumeError } from '../services/resumeErrors.js';
 import { notifyRecommendationReady } from '../services/push.service.js';
+import { attachWorkerLogging } from '../queue/queueDiagnostics.js';
 
 // Generates one recommendation run:
 //   select candidate jobs (selecting_jobs) → shared quota check → Gemini
@@ -198,6 +199,6 @@ export function startRecommendationWorker({ rankJobs, quota, concurrency }) {
     concurrency,
     settings: { backoffStrategy: (attemptsMade) => jitterBackoff(attemptsMade) },
   });
-  worker.on('error', (error) => console.error(`[recommendation-worker] ${error.message}`));
+  attachWorkerLogging(worker, 'recommendation-worker');
   return worker;
 }

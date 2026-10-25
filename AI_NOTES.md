@@ -2740,3 +2740,28 @@ Real delivery and tapping a real notification were not verified. Blockers:
 5. Logout: "Build your profile", Recommended (0); the device moved to a new guest.
 6. Login D again: Asha profile, `Asha_Resume.pdf`, Recommended (8); the device moved back to D.
 - **Tests:** backend 162/162, frontend 50/50. No credential text in the logs; the key file is still ignored.
+
+## Prompt #52: Queue diagnostics (production jobs stay "queued")
+
+- **Date/time:** 2026-10-25
+- **AI tool:** Claude
+- **Exact prompt:** "can you add some log so we could identify the problem ?"
+
+### Added
+- `src/queue/queueDiagnostics.js`:
+  - worker lifecycle logs: connected (Redis host + queue name), job started (attempt), completed (ms), failed (reason), stalled, error;
+  - `queueHealth()` and `queueHints()`.
+- `GET /health/queues`: per queue `workers` (connected workers), `waiting`, `active`, `delayed`, `failed`, `completed`, plus `redis` (host, no password) and plain-language hints.
+- **API logs:** `[queue] <queue>: job <id> added (redis …)`, or why adding failed.
+- **Worker start-up** logs the Redis host and both queue names.
+- No passwords, file contents or personal data in any log or report.
+
+### Verified (local Docker)
+- **Worker stopped + upload:** the report showed `workers: 0, waiting: 1` with the hint "no worker is connected to this Redis"; the API logged the add.
+- **Worker started:** logs show the job started and "completed in 7527 ms".
+- **Tests:** backend 165/165 (+3).
+
+### How to use on Render
+Open `https://spire-ai-assesment.onrender.com/health/queues` after deploying:
+- `workers: 0` with waiting jobs → no worker on that Redis;
+- different `redis` hosts in the API and worker logs → they use different REDIS_URL values.
